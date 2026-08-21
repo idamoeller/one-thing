@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>One Thing</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="One Thing">
+<meta name="theme-color" content="#E6E9E3">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAC80lEQVR4nO3dMW5bRxRA0e/AS3Bl78FFGu+/TJMiK0ohQBCgXEaSxf9nHs+pCeKB786QFf+Xbz++H/Bf/rh6ANYlDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SF+vHuBi//z91+0X/Pzz1zmTLOjLtx/fr57hbP8bRHm0UB4rjg9n8dLjJPIQcXxKE6+Nr2T+D9I7lXHXd17E5JvjtOVNvULG3hxnHuupV8jMOM7f1sg+BsZx1Z7m9TEtjms3NKyPUXGssJsVZvgsc+JYZyvrTPKbhsSx2j5Wm+djJsSx5ibWnOpdJsTBnWwfx8oHdOXZ3mLvONb/9Nef8Ia94+CuxEHaOI5dbuxd5nxt4zi4t13j2Os47jXts13j4ATiIImDtGUcO36F7zjzlnFwDnGQxEESB0kcJHGQxEESB0kcJHGQtoxjx7882HHmLePgHOIgiYO0axx7fYXvNe2zXePgBBvHsctx3GXO1zaOg3sTB2nvONa/sdef8Ia94zjW/vRXnu0tto+D+5kQx5oHdM2p3mVCHMd6m1htno8ZEsex0j7WmeQ3zYnjWGMrK8zwWUbFcVy9m0llHPPiOK7b0LAyjpFxHFfsaV4Zx9Q4jnO3NbKMY/ZjvJ7c9b8PpmbxZOzN8ex++5tdxvEIN8dLniv7Lo8VxxNPpH6jR4zjJc+yv+HR4+CG+T9I+TBxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkP4FYVdzO1avxGkAAAAASUVORK5CYII=">
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIk9uZSBUaGluZyIsICJzaG9ydF9uYW1lIjogIk9uZSBUaGluZyIsICJzdGFydF91cmwiOiAiLiIsICJzY29wZSI6ICIuIiwgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNFNkU5RTMiLCAidGhlbWVfY29sb3IiOiAiI0U2RTlFMyIsICJpY29ucyI6IFt7InNyYyI6ICJkYXRhOmltYWdlL3BuZztiYXNlNjQsaVZCT1J3MEtHZ29BQUFBTlNVaEVVZ0FBQUxRQUFBQzBDQUlBQUFDeXI1RmxBQUFDODBsRVFWUjRuTzNkTVc1YlJ4UkEwZS9BUzNCbDc4RkZHdSsvVEpNaUswb2hRQkNnWEVhU3hmOW5IcytwQ2VLQjc4NlFGZitYYnorK0gvQmYvcmg2QU5ZbERwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTT0lnaVlNa0RwSTRTRit2SHVCaS8vejkxKzBYL1B6ejF6bVRMT2pMdHgvZnI1N2hiUDhiUkhtMFVCNHJqZzluOGRMakpQSVFjWHhLRTYrTnIyVCtEOUk3bFhIWGQxN0U1SnZqdE9WTnZVTEczaHhuSHV1cFY4ak1PTTdmMXNnK0JzWngxWjdtOVRFdGptczNOS3lQVVhHc3NKc1ZadmdzYytKWVp5dnJUUEtiaHNTeDJqNVdtK2RqSnNTeDVpYlduT3BkSnNUQm5Xd2Z4OG9IZE9YWjNtTHZPTmIvOU5lZjhJYTk0K0N1eEVIYU9JNWRidXhkNW54dDR6aTR0MTNqMk9zNDdqWHRzMTNqNEFUaUlJbUR0R1VjTzM2Rjd6anpsbkZ3RG5HUXhFRVNCMGtjSkhHUXhFRVNCMGtjSkhHUXRveGp4Nzg4MkhIbUxlUGdIT0lnaVlPMGF4eDdmWVh2TmUyelhlUGdCQnZIc2N0eDNHWE8xemFPZzNzVEIybnZPTmEvc2RlZjhJYTk0empXL3ZSWG51MHR0bytEKzVrUXg1b0hkTTJwM21WQ0hNZDZtMWh0bm84WkVzZXgwajdXbWVRM3pZbmpXR01ySzh6d1dVYkZjVnk5bTBsbEhQUGlPSzdiMExBeWpwRnhIRmZzYVY0Wng5UTRqbk8zTmJLTVkvWmp2SjdjOWI4UHBtYnhaT3pOOGV4Kys1dGR4dkVJTjhkTG5pdjdMbzhWeHhOUHBINmpSNHpqSmMreXYrSFI0K0NHK1Q5SStUQnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrTVJCRWdkSkhDUnhrUDRGWVZkek8xYXZ4R2tBQUFBQVNVVk9SSzVDWUlJPSIsICJzaXplcyI6ICIxODB4MTgwIiwgInR5cGUiOiAiaW1hZ2UvcG5nIiwgInB1cnBvc2UiOiAiYW55In1dfQ==">
+<style>
+:root{
+  --ink:#141B1A; --mist:#E6E9E3; --mist-2:#D9DDD5; --stone:#6E7A76;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --serif:Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{font-family:var(--sans);background-color:#E6E9E3;color:#141B1A;min-height:100vh;-webkit-font-smoothing:antialiased;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;padding:0;}
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--stone);outline-offset:3px;}
+
+.wrap{max-width:540px;margin:0 auto;padding:22px 22px 70px;padding-top:max(22px,env(safe-area-inset-top));}
+.nav{display:flex;gap:22px;align-items:center;padding:4px 0 30px;}
+.nav button{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--stone);padding:8px 0;}
+.nav button.on{color:var(--ink);font-weight:800;}
+.tally{margin-left:auto;font-family:var(--serif);font-style:italic;font-size:14px;color:var(--stone);}
+
+h1.h{font-size:clamp(1.7rem,7.5vw,2.35rem);font-weight:800;letter-spacing:-.03em;line-height:1.03;margin:0 0 28px;}
+.lbl{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--stone);}
+
+textarea.dump{
+  width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--mist-2);
+  font-family:inherit;font-size:1.25rem;font-weight:500;line-height:1.35;letter-spacing:-.015em;
+  color:var(--ink);padding:0 0 14px;resize:none;min-height:78px;border-radius:0;
+}
+textarea.dump::placeholder{color:var(--stone);opacity:.6;font-weight:400;}
+textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
+
+.dial{display:flex;align-items:center;gap:10px;margin-top:14px;}
+.dial .lbl{width:72px;flex:none;white-space:nowrap;}
+.chips{flex:1;min-width:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.chip{
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  width:100%;min-height:40px;padding:9px 4px;border-radius:999px;
+  font-size:12.5px;font-weight:600;letter-spacing:.01em;
+  border:1px solid rgba(110,122,118,.35);color:var(--stone);background:transparent;
+  transition:background-color .18s,color .18s,border-color .18s;
+}
+.chip.on{background-color:#141B1A;border-color:#141B1A;color:#E6E9E3;}
+
+.btn{display:block;width:100%;background-color:#141B1A;color:#E6E9E3;font-size:14px;font-weight:700;
+  letter-spacing:.04em;padding:17px;border-radius:2px;margin-top:24px;transition:opacity .18s;}
+.btn[disabled]{opacity:.25;cursor:default;}
+.btn.ghost{background:transparent;color:#141B1A;border:1.5px solid #141B1A;margin-top:34px;}
+
+.rule{height:1px;background:var(--mist-2);margin:38px 0 20px;}
+.row{display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid rgba(110,122,118,.16);}
+.row .txt{flex:1;font-size:.98rem;font-weight:500;line-height:1.32;letter-spacing:-.01em;}
+.tags{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);margin-top:6px;font-weight:700;}
+.x{color:var(--stone);font-size:22px;line-height:1;padding:2px 6px;flex:none;}
+
+.opt{border-top:1px solid rgba(110,122,118,.2);}
+.opt:last-of-type{border-bottom:1px solid rgba(110,122,118,.2);}
+.opt .head{width:100%;text-align:left;padding:23px 0;display:flex;align-items:baseline;gap:12px;}
+.opt h2{margin:0;font-size:1.22rem;font-weight:700;letter-spacing:-.02em;}
+.opt .hint{font-family:var(--serif);font-style:italic;font-size:.95rem;color:var(--stone);margin-left:auto;}
+.body{padding:0 0 26px;}
+.scroll{max-height:44vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.pickrow{display:block;width:100%;text-align:left;padding:15px 0;font-size:1rem;font-weight:500;
+  letter-spacing:-.01em;line-height:1.3;border-bottom:1px solid rgba(110,122,118,.16);}
+.pickrow:last-child{border-bottom:none;}
+.empty{font-family:var(--serif);font-style:italic;font-size:1.03rem;color:var(--stone);}
+
+.stage{
+  position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999;
+  background-color:#E6E9E3; color:#141B1A;
+  overflow-y:auto; -webkit-overflow-scrolling:touch;
+  display:flex; flex-direction:column;
+}
+.stagein{
+  width:100%; max-width:600px; margin:0 auto; flex:1;
+  display:flex; flex-direction:column;
+  padding:22px 20px 36px;
+  padding-top:max(22px,env(safe-area-inset-top));
+  padding-bottom:max(36px,env(safe-area-inset-bottom));
+  min-height:100%;
+}
+.top{display:flex;justify-content:flex-end;}
+.top button{font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:rgba(20,27,26,.5);padding:8px 2px;}
+.mid{flex:1;display:flex;flex-direction:column;justify-content:center;padding:22px 0;min-height:130px;}
+.task{
+  color:#141B1A;text-align:center;
+  font-size:clamp(2.5rem,12.5vw,4.6rem);font-weight:800;
+  letter-spacing:-.04em;line-height:1.03;margin:0;
+  overflow-wrap:break-word;word-wrap:break-word;
+}
+
+.tprop{display:flex;flex-direction:column;align-items:center;gap:18px;}
+.timerbox{position:relative;width:176px;height:176px;}
+.timerbox svg{display:block;width:176px;height:176px;}
+.clock{
+  position:absolute;left:0;top:0;width:176px;height:176px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:33px;font-weight:700;letter-spacing:.01em;color:#141B1A;
+}
+.tset{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;width:100%;max-width:270px;}
+.tcustom{display:grid;grid-template-columns:1fr auto auto;gap:8px;width:100%;max-width:270px;}
+.tbtn{
+  display:flex;align-items:center;justify-content:center;min-height:40px;border-radius:999px;
+  font-size:12.5px;font-weight:600;letter-spacing:.01em;padding:0 8px;
+  border:1px solid rgba(20,27,26,.3);color:rgba(20,27,26,.72);background:transparent;
+}
+.tbtn.on{background-color:#141B1A;border-color:#141B1A;color:#E6E9E3;}
+.cin{
+  min-height:40px;border-radius:999px;border:1px solid rgba(20,27,26,.3);
+  background:transparent;color:#141B1A;font-family:inherit;
+  font-size:13px;font-weight:600;text-align:center;padding:0 10px;width:100%;
+}
+.cin::placeholder{color:rgba(20,27,26,.4);font-weight:500;}
+.run{
+  display:flex;align-items:center;justify-content:center;
+  min-width:172px;min-height:48px;border-radius:999px;
+  border:1.5px solid #141B1A;color:#141B1A;background:transparent;
+  font-size:12px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;
+}
+.run.go{background-color:#141B1A;color:#E6E9E3;}
+.note{font-family:var(--serif);font-style:italic;font-size:.95rem;color:rgba(20,27,26,.6);text-align:center;margin:0;}
+.foot{display:flex;gap:30px;justify-content:center;margin-top:32px;}
+.foot button{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:rgba(20,27,26,.55);padding:11px 2px;}
+.foot button.key{color:#141B1A;}
+</style>
+</head>
+<body>
+<div id="app"><div class="wrap"><p class="empty">Starting...</p></div></div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY="onething:v1";
+  var LEVELS=["low","med","high"];
+  var TIMES=["quick","med","long"];
+  var RANK={low:1,med:2,high:3};
+  var TICKS=60, CX=88, CY=88, RIN=68, ROUT=82;
+  var ON="#141B1A", OFF="rgba(20,27,26,.16)";
+
+  var tasks=[];
+  var screen="collect", activeId=null, method="deal", openSec="feel", flash="";
+  var draft={text:"",p:"med",u:"med",e:"med",t:"med"};
+  var filters={priority:[],urgency:[],energy:[],time:[]};
+  var timer={mins:5,left:300,run:false,rang:false,iv:null,custom:false,cval:"",lastLit:-1};
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g,function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+  function openTasks(){ return tasks.filter(function(t){ return !t.done; }); }
+  function tof(t){ return t.time || "med"; }
+
+  function load(){
+    try{
+      var raw = window.localStorage ? localStorage.getItem(KEY) : null;
+      if(!raw) return;
+      var d = JSON.parse(raw);
+      if(d && d.tasks){
+        tasks = d.tasks.map(function(t){ if(!t.time) t.time="med"; return t; });
+      }
+      var m = parseInt(d && d.mins,10);
+      if(!isNaN(m) && m>0 && m<=600){ timer.mins=m; timer.left=m*60; }
+    }catch(e){}
+  }
+  function save(){
+    try{
+      if(window.localStorage){
+        localStorage.setItem(KEY, JSON.stringify({tasks:tasks,mins:timer.mins}));
+      }
+    }catch(e){}
+  }
+
+  function matching(){
+    return openTasks().filter(function(t){
+      return (!filters.priority.length||filters.priority.indexOf(t.priority)>-1)
+          && (!filters.urgency.length||filters.urgency.indexOf(t.urgency)>-1)
+          && (!filters.energy.length||filters.energy.indexOf(t.energy)>-1)
+          && (!filters.time.length||filters.time.indexOf(tof(t))>-1);
+    });
+  }
+  function pickOne(list,skip){
+    var pool=list.filter(function(t){ return t.id!==skip; });
+    if(!pool.length) pool=list;
+    if(!pool.length) return null;
+    var scores=pool.map(function(t){ return RANK[t.priority]+RANK[t.urgency]; });
+    var best=Math.max.apply(null,scores);
+    var top=pool.filter(function(t){ return RANK[t.priority]+RANK[t.urgency]===best; });
+    return top[Math.floor(Math.random()*top.length)];
+  }
+
+  function chips(label,dim,val,multi,scale){
+    var levels=scale||LEVELS;
+    var h='<div class="dial"><span class="lbl">'+label+'</span><div class="chips">';
+    for(var i=0;i<levels.length;i++){
+      var l=levels[i];
+      var on=multi?(val.indexOf(l)>-1):(val===l);
+      h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'"'
+        +' data-act="chip" data-dim="'+dim+'" data-val="'+l+'"'
+        +' data-multi="'+(multi?1:0)+'">'+l+'</button>';
+    }
+    return h+'</div></div>';
+  }
+
+  function collectView(){
+    var o=openTasks();
+    var h='<h1 class="h">Get it out of your head</h1>'
+      +'<textarea class="dump" id="dump" placeholder="What is on your mind?" aria-label="New thought">'+esc(draft.text)+'</textarea>'
+      +chips("Priority","p",draft.p,false,LEVELS)
+      +chips("Urgency","u",draft.u,false,LEVELS)
+      +chips("Energy","e",draft.e,false,LEVELS)
+      +chips("Time","t",draft.t,false,TIMES)
+      +'<button class="btn" data-act="add"'+(draft.text.replace(/\s/g,"")?"":" disabled")+'>Add it</button>'
+      +'<div class="rule"></div>'
+      +'<span class="lbl">'+(o.length?("The pile &mdash; "+o.length):"The pile")+'</span>';
+    if(!o.length){
+      h+='<p class="empty" style="margin-top:14px">Nothing here yet. Type the first thing above.</p>';
+      return h;
+    }
+    h+='<div style="margin-top:8px">';
+    for(var i=0;i<o.length;i++){
+      var t=o[i];
+      h+='<div class="row"><div class="txt">'+esc(t.text)
+        +'<div class="tags">'+t.priority+' pri &middot; '+t.urgency+' urg &middot; '
+        +t.energy+' nrg &middot; '+tof(t)+'</div></div>'
+        +'<button class="x" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
+    }
+    h+='</div><button class="btn ghost" data-act="go-choose">Pick one to do</button>';
+    return h;
+  }
+
+  function chooseView(){
+    var o=openTasks();
+    if(!o.length){ return '<h1 class="h">Nothing left</h1>'; }
+    var m=matching();
+    var secs=[["feel","By how it feels","match my capacity"],
+              ["pick","I already know","choose it myself"],
+              ["deal","Dealer&#39;s choice","surprise me"]];
+    var h='<h1 class="h">How should I pick?</h1>';
+    for(var i=0;i<secs.length;i++){
+      var s=secs[i];
+      h+='<section class="opt"><button class="head" data-act="sec" data-sec="'+s[0]+'"'
+        +' aria-expanded="'+(openSec===s[0])+'"><h2>'+s[1]+'</h2>'
+        +'<span class="hint">'+s[2]+'</span></button>';
+      if(openSec===s[0]){
+        h+='<div class="body">';
+        if(s[0]==="feel"){
+          h+=chips("Priority","priority",filters.priority,true,LEVELS)
+            +chips("Urgency","urgency",filters.urgency,true,LEVELS)
+            +chips("Energy","energy",filters.energy,true,LEVELS)
+            +chips("Time","time",filters.time,true,TIMES)
+            +'<button class="btn" data-act="show-one"'+(m.length?"":" disabled")+'>'
+            +(m.length?("Show me one &mdash; "+m.length+" match"):"Nothing matches that")
+            +'</button>';
+        } else if(s[0]==="pick"){
+          h+='<div class="scroll">';
+          for(var j=0;j<o.length;j++){
+            h+='<button class="pickrow" data-act="pick" data-id="'+o[j].id+'">'+esc(o[j].text)+'</button>';
+          }
+          h+='</div>';
+        } else {
+          h+='<button class="btn" data-act="deal">Deal me one</button>';
+        }
+        h+='</div>';
+      }
+      h+='</section>';
+    }
+    return h;
+  }
+
+  function clockText(){
+    var mm=String(Math.floor(timer.left/60));
+    var ss=String(timer.left%60);
+    if(mm.length<2) mm="0"+mm;
+    if(ss.length<2) ss="0"+ss;
+    return mm+":"+ss;
+  }
+
+  function litCount(){
+    var total=timer.mins*60;
+    if(total<=0) return 0;
+    var n=Math.ceil(TICKS*(timer.left/total));
+    if(n<0) n=0;
+    if(n>TICKS) n=TICKS;
+    return n;
+  }
+
+  function ticksSVG(){
+    var lit=litCount();
+    var h="";
+    for(var i=0;i<TICKS;i++){
+      var ang=(i/TICKS)*2*Math.PI - Math.PI/2;
+      var c=Math.cos(ang), s=Math.sin(ang);
+      h+='<line class="tk" x1="'+(CX+RIN*c).toFixed(2)+'" y1="'+(CY+RIN*s).toFixed(2)
+        +'" x2="'+(CX+ROUT*c).toFixed(2)+'" y2="'+(CY+ROUT*s).toFixed(2)
+        +'" stroke="'+(i<lit?ON:OFF)+'" stroke-width="2.4" stroke-linecap="butt"></line>';
+    }
+    timer.lastLit=lit;
+    return h;
+  }
+
+  function paintTicks(){
+    var lit=litCount();
+    if(lit===timer.lastLit) return;
+    timer.lastLit=lit;
+    var els=document.getElementsByClassName("tk");
+    for(var i=0;i<els.length;i++){
+      els[i].setAttribute("stroke", i<lit?ON:OFF);
+    }
+  }
+
+  function focusView(t){
+    var h='<div class="stage" style="background-color:#E6E9E3;color:#141B1A">'
+      +'<div class="stagein">'
+      +'<div class="top"><button data-act="back" style="color:rgba(20,27,26,.5)">&larr; all tasks</button></div>'
+      +'<div class="mid"><h1 class="task" style="color:#141B1A">'+esc(t.text)+'</h1></div>'
+      +'<div class="tprop">'
+      +'<div class="timerbox">'
+      +'<svg viewBox="0 0 176 176" aria-hidden="true">'+ticksSVG()+'</svg>'
+      +'<div class="clock" id="clock" style="color:#141B1A">'+clockText()+'</div>'
+      +'</div>';
+
+    if(timer.custom){
+      h+='<div class="tcustom">'
+        +'<input class="cin" id="cmin" type="number" inputmode="numeric" min="1" max="600"'
+        +' placeholder="minutes" value="'+esc(timer.cval)+'" aria-label="Minutes">'
+        +'<button class="tbtn on" data-act="setcustom"'
+        +' style="background-color:#141B1A;border-color:#141B1A;color:#E6E9E3">Set</button>'
+        +'<button class="tbtn" data-act="cancelcustom" aria-label="Cancel"'
+        +' style="color:rgba(20,27,26,.72)">&times;</button>'
+        +'</div>';
+    } else {
+      h+='<div class="tset">'
+        +'<button class="tbtn on" data-act="uselast" data-min="'+timer.mins+'"'
+        +' style="background-color:#141B1A;border-color:#141B1A;color:#E6E9E3">'
+        +timer.mins+' min</button>'
+        +'<button class="tbtn" data-act="custom" style="color:rgba(20,27,26,.72)">Custom</button>'
+        +'</div>';
+    }
+
+    if(timer.rang){
+      h+='<p class="note">Time. Stretch, then decide.</p>'
+        +'<button class="run" data-act="reset" style="color:#141B1A">Start again</button>';
+    } else if(timer.run){
+      h+='<button class="run" data-act="toggle" style="color:#141B1A">Pause</button>';
+    } else {
+      h+='<button class="run go" data-act="toggle"'
+        +' style="background-color:#141B1A;color:#E6E9E3">Start</button>';
+    }
+    h+='</div><div class="foot">'
+      +'<button class="key" data-act="done" style="color:#141B1A">Done</button>'
+      +'<button data-act="another" style="color:rgba(20,27,26,.55)">Something else</button>'
+      +'</div></div></div>';
+    return h;
+  }
+
+  function draw(){
+    var app=document.getElementById("app");
+    var active=null;
+    for(var i=0;i<tasks.length;i++){ if(tasks[i].id===activeId) active=tasks[i]; }
+
+    if(screen==="focus" && active){
+      app.innerHTML=focusView(active);
+      return;
+    }
+    var today=new Date().toDateString();
+    var doneToday=tasks.filter(function(x){
+      return x.done && x.doneAt && new Date(x.doneAt).toDateString()===today;
+    }).length;
+
+    var h='<div class="wrap"><nav class="nav">'
+      +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
+      +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
+      +(doneToday?('<span class="tally">'+doneToday+' done today</span>'):'')
+      +'</nav>';
+    if(flash) h+='<p class="empty" style="margin:-12px 0 24px">'+esc(flash)+'</p>';
+    h+=(screen==="collect"?collectView():chooseView())+'</div>';
+    app.innerHTML=h;
+  }
+
+  function render(){
+    try{ draw(); }
+    catch(err){
+      document.getElementById("app").innerHTML=
+        '<div class="wrap"><h1 class="h">Something broke.</h1>'
+        +'<p class="empty">'+esc(err && err.message ? err.message : String(err))+'</p></div>';
+    }
+  }
+
+  function stopTimer(){ timer.run=false; if(timer.iv){ clearInterval(timer.iv); timer.iv=null; } }
+  function resetTimer(){ stopTimer(); timer.left=timer.mins*60; timer.rang=false; timer.lastLit=-1; }
+  function tick(){
+    timer.left=Math.max(0,timer.left-1);
+    var c=document.getElementById("clock");
+    if(c) c.textContent=clockText();
+    paintTicks();
+    if(timer.left===0){ stopTimer(); timer.rang=true; chime(); render(); }
+  }
+  function chime(){
+    try{
+      var Ctx=window.AudioContext||window.webkitAudioContext;
+      if(!Ctx) return;
+      var ac=new Ctx();
+      var notes=[0,0.28];
+      for(var i=0;i<notes.length;i++){
+        (function(dd,idx){
+          var o=ac.createOscillator(), g=ac.createGain();
+          o.frequency.value=idx?660:880;
+          o.connect(g); g.connect(ac.destination);
+          g.gain.setValueAtTime(0.0001,ac.currentTime+dd);
+          g.gain.exponentialRampToValueAtTime(0.15,ac.currentTime+dd+0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+dd+0.5);
+          o.start(ac.currentTime+dd); o.stop(ac.currentTime+dd+0.55);
+        })(notes[i],i);
+      }
+    }catch(e){}
+  }
+
+  document.addEventListener("input",function(ev){
+    if(!ev.target) return;
+    if(ev.target.id==="dump"){
+      draft.text=ev.target.value;
+      var b=document.querySelector('[data-act="add"]');
+      if(b){
+        if(draft.text.replace(/\s/g,"")) b.removeAttribute("disabled");
+        else b.setAttribute("disabled","");
+      }
+    } else if(ev.target.id==="cmin"){
+      timer.cval=ev.target.value;
+    }
+  });
+
+  document.addEventListener("click",function(ev){
+    var el=ev.target;
+    while(el && el!==document && !el.getAttribute){ el=el.parentNode; }
+    while(el && el!==document && !el.getAttribute("data-act")){ el=el.parentNode; }
+    if(!el || el===document) return;
+    var a=el.getAttribute("data-act");
+    var d=document.getElementById("dump");
+    if(d) draft.text=d.value;
+    var ci=document.getElementById("cmin");
+    if(ci) timer.cval=ci.value;
+
+    if(a==="nav"){ screen=el.getAttribute("data-to"); flash=""; render(); }
+    else if(a==="chip"){
+      var dim=el.getAttribute("data-dim"), val=el.getAttribute("data-val");
+      if(el.getAttribute("data-multi")==="1"){
+        var arr=filters[dim], k=arr.indexOf(val);
+        if(k>-1) arr.splice(k,1); else arr.push(val);
+      } else {
+        draft[dim]=val;
+      }
+      render();
+    }
+    else if(a==="add"){
+      var v=(draft.text||"").replace(/^\s+|\s+$/g,"");
+      if(!v) return;
+      tasks.unshift({id:uid(),text:v,priority:draft.p,urgency:draft.u,
+                     energy:draft.e,time:draft.t,done:false,createdAt:Date.now()});
+      draft.text=""; draft.p="med"; draft.u="med"; draft.e="med"; draft.t="med";
+      save(); render();
+      var nd=document.getElementById("dump"); if(nd) nd.focus();
+    }
+    else if(a==="del"){
+      var id=el.getAttribute("data-id");
+      tasks=tasks.filter(function(t){ return t.id!==id; });
+      save(); render();
+    }
+    else if(a==="go-choose"){ screen="choose"; flash=""; render(); }
+    else if(a==="sec"){
+      var sc=el.getAttribute("data-sec");
+      openSec=(openSec===sc?"":sc);
+      render();
+    }
+    else if(a==="show-one"||a==="deal"){
+      var list=(a==="show-one")?matching():openTasks();
+      var t1=pickOne(list,null);
+      if(!t1) return;
+      method=(a==="show-one")?"filter":"deal";
+      activeId=t1.id; screen="focus"; timer.custom=false; resetTimer(); render();
+    }
+    else if(a==="pick"){
+      method="pick"; activeId=el.getAttribute("data-id");
+      screen="focus"; timer.custom=false; resetTimer(); render();
+    }
+    else if(a==="toggle"){
+      timer.rang=false;
+      if(timer.run){ stopTimer(); }
+      else { timer.run=true; timer.iv=setInterval(tick,1000); }
+      render();
+    }
+    else if(a==="uselast"){ resetTimer(); render(); }
+    else if(a==="custom"){
+      timer.custom=true; timer.cval=String(timer.mins); render();
+      var inp=document.getElementById("cmin");
+      if(inp){ try{ inp.focus(); inp.select(); }catch(e){} }
+    }
+    else if(a==="setcustom"){
+      var n=parseInt(timer.cval,10);
+      if(!isNaN(n) && n>0 && n<=600){
+        timer.mins=n; resetTimer(); save();
+      }
+      timer.custom=false; render();
+    }
+    else if(a==="cancelcustom"){ timer.custom=false; render(); }
+    else if(a==="reset"){ resetTimer(); render(); }
+    else if(a==="done"){
+      var did=activeId;
+      tasks=tasks.map(function(t){
+        if(t.id!==did) return t;
+        t.done=true; t.doneAt=Date.now(); return t;
+      });
+      save(); stopTimer(); activeId=null; screen="choose";
+      flash="Done. That is one less.";
+      render();
+      setTimeout(function(){ flash=""; if(screen==="choose") render(); },2800);
+    }
+    else if(a==="another"){
+      var pool=(method==="filter")?matching():openTasks();
+      var alt=pool.filter(function(t){ return t.id!==activeId; });
+      if(!alt.length) alt=openTasks().filter(function(t){ return t.id!==activeId; });
+      if(!alt.length) return;
+      var nx=pickOne(alt,null);
+      if(!nx) return;
+      activeId=nx.id; resetTimer(); render();
+    }
+    else if(a==="back"){ stopTimer(); activeId=null; screen="choose"; render(); }
+  });
+
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
