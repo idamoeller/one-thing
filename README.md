@@ -1,6 +1,3 @@
-# one-thing
-Minimalist app to focus on one task at a time
-
 # One Thing
 
 A minimalist focus app — dumps my whole to-do list, then shows me one task at a time
