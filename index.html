@@ -27,7 +27,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
 .nav{display:flex;gap:22px;align-items:center;padding:4px 0 30px;}
 .nav button{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--stone);padding:8px 0;}
 .nav button.on{color:var(--ink);font-weight:800;}
-.tally{margin-left:auto;font-family:var(--serif);font-style:italic;font-size:14px;color:var(--stone);}
+.tally{margin-left:auto;}
+.tally.on{color:var(--ink);font-weight:800;}
 
 h1.h{font-size:clamp(1.7rem,7.5vw,2.35rem);font-weight:800;letter-spacing:-.03em;line-height:1.03;margin:0 0 28px;}
 .lbl{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--stone);}
@@ -57,6 +58,13 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   letter-spacing:.04em;padding:17px;border-radius:2px;margin-top:24px;transition:opacity .18s;}
 .btn[disabled]{opacity:.25;cursor:default;}
 .btn.ghost{background:transparent;color:#141B1A;border:1.5px solid #141B1A;margin-top:34px;}
+
+.afield{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--mist-2);
+  font-family:inherit;font-size:1.15rem;font-weight:500;color:var(--ink);
+  padding:8px 0 12px;margin-top:8px;border-radius:0;}
+.afield:focus{outline:none;border-bottom-color:var(--ink);}
+.afield::placeholder{color:var(--stone);opacity:.55;font-weight:400;}
+.nav .signout{margin-left:auto;}
 
 .rule{height:1px;background:var(--mist-2);margin:38px 0 20px;}
 .row{display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid rgba(110,122,118,.16);}
@@ -138,10 +146,16 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 <body>
 <div id="app"><div class="wrap"><p class="empty">Starting...</p></div></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
   "use strict";
   var KEY="onething:v1";
+  var SUPABASE_URL="https://ikxwpjsytrzloyjvysnt.supabase.co";
+  var SUPABASE_ANON_KEY="sb_publishable_kkkCjaUdDiFYKeE8bkB-7g_clq8LFiO";
+  var sb = (window.supabase && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
   var LEVELS=["low","med","high"];
   var TIMES=["quick","med","long"];
   var CONTEXTS=["personal","work"];
@@ -151,6 +165,8 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 
   var tasks=[];
   var screen="collect", activeId=null, method="deal", openSec="feel", flash="";
+  var booting=true;
+  var user=null, authedId, authMode="signin", authEmail="", authPass="", authMsg="", authBusy=false;
   var draft={text:"",p:"",u:"",e:"",t:"",c:""};
   var filters={priority:[],urgency:[],energy:[],time:[],context:[]};
   var timer={mins:5,left:300,run:false,rang:false,iv:null,custom:false,cval:"",lastLit:-1};
@@ -166,25 +182,34 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   function canAdd(){
     return !!(draft.text.replace(/\s/g,"") && draft.p && draft.u && draft.e && draft.t && draft.c);
   }
+  function errmsg(e){ return (e && e.message) ? e.message : String(e); }
 
-  function load(){
+  // The timer's last-used duration is a local preference, not a task, so it
+  // still lives in localStorage. Tasks now live in Supabase.
+  function loadMins(){
     try{
       var raw = window.localStorage ? localStorage.getItem(KEY) : null;
       if(!raw) return;
       var d = JSON.parse(raw);
-      if(d && d.tasks){
-        tasks = d.tasks.map(function(t){ if(!t.time) t.time="med"; if(!t.context) t.context="work"; return t; });
-      }
       var m = parseInt(d && d.mins,10);
       if(!isNaN(m) && m>0 && m<=600){ timer.mins=m; timer.left=m*60; }
     }catch(e){}
   }
-  function save(){
+  function saveMins(){
     try{
       if(window.localStorage){
-        localStorage.setItem(KEY, JSON.stringify({tasks:tasks,mins:timer.mins}));
+        localStorage.setItem(KEY, JSON.stringify({mins:timer.mins}));
       }
     }catch(e){}
+  }
+  function normalize(t){ if(!t.time) t.time="med"; if(!t.context) t.context="work"; return t; }
+  function loadTasks(){
+    if(!sb) return Promise.reject(new Error("Supabase client failed to load (check your connection)."));
+    return sb.from("tasks").select("*").order("created_at",{ascending:false})
+      .then(function(res){
+        if(res.error) throw res.error;
+        tasks = (res.data||[]).map(normalize);
+      });
   }
 
   function matching(){
@@ -217,6 +242,23 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
         +' data-multi="'+(multi?1:0)+'">'+l+'</button>';
     }
     return h+'</div></div>';
+  }
+
+  function authView(){
+    var signup = authMode==="signup";
+    var h='<h1 class="h">'+(signup?"Create your account":"Sign in")+'</h1>'
+      +'<span class="lbl">Email</span>'
+      +'<input class="afield" id="email" type="email" inputmode="email" autocomplete="email"'
+      +' placeholder="you@example.com" value="'+esc(authEmail)+'" aria-label="Email">'
+      +'<span class="lbl" style="display:block;margin-top:20px">Password</span>'
+      +'<input class="afield" id="pass" type="password" autocomplete="'+(signup?"new-password":"current-password")+'"'
+      +' placeholder="At least 6 characters" value="'+esc(authPass)+'" aria-label="Password">'
+      +'<button class="btn" data-act="auth-submit"'+(authBusy?" disabled":"")+'>'
+      +(authBusy?(signup?"Creating…":"Signing in…"):(signup?"Sign up":"Sign in"))+'</button>';
+    if(authMsg) h+='<p class="empty" style="margin-top:16px">'+esc(authMsg)+'</p>';
+    h+='<button class="btn ghost" data-act="auth-toggle">'
+      +(signup?"I already have an account":"Create an account")+'</button>';
+    return h;
   }
 
   function collectView(){
@@ -284,6 +326,28 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       }
       h+='</section>';
     }
+    return h;
+  }
+
+  function doneView(){
+    var today=new Date().toDateString();
+    var done=tasks.filter(function(x){
+      return x.done && x.doneAt && new Date(x.doneAt).toDateString()===today;
+    });
+    done.sort(function(a,b){ return b.doneAt-a.doneAt; });
+    var h='<h1 class="h">Done today</h1>';
+    if(!done.length){
+      h+='<p class="empty">Nothing finished yet today.</p>';
+      return h;
+    }
+    h+='<div style="margin-top:8px">';
+    for(var i=0;i<done.length;i++){
+      var t=done[i];
+      h+='<div class="row"><div class="txt">'+esc(t.text)
+        +'<div class="tags">'+t.priority+' pri &middot; '+t.urgency+' urg &middot; '
+        +t.energy+' nrg &middot; '+tof(t)+' &middot; '+(t.context||"work")+'</div></div></div>';
+    }
+    h+='</div>';
     return h;
   }
 
@@ -375,6 +439,16 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 
   function draw(){
     var app=document.getElementById("app");
+
+    if(booting){
+      app.innerHTML='<div class="wrap"><p class="empty" style="margin-top:20px">Loading&hellip;</p></div>';
+      return;
+    }
+    if(!user){
+      app.innerHTML='<div class="wrap">'+authView()+'</div>';
+      return;
+    }
+
     var active=null;
     for(var i=0;i<tasks.length;i++){ if(tasks[i].id===activeId) active=tasks[i]; }
 
@@ -390,10 +464,11 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     var h='<div class="wrap"><nav class="nav">'
       +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
       +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
-      +(doneToday?('<span class="tally">'+doneToday+' done today</span>'):'')
+      +(doneToday?('<button class="tally'+(screen==="done"?" on":"")+'" data-act="nav" data-to="done">'+doneToday+' done today</button>'):'')
+      +'<button class="signout" data-act="signout">Sign out</button>'
       +'</nav>';
     if(flash) h+='<p class="empty" style="margin:-12px 0 24px">'+esc(flash)+'</p>';
-    h+=(screen==="collect"?collectView():chooseView())+'</div>';
+    h+=(screen==="collect"?collectView():(screen==="done"?doneView():chooseView()))+'</div>';
     app.innerHTML=h;
   }
 
@@ -446,6 +521,10 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       }
     } else if(ev.target.id==="cmin"){
       timer.cval=ev.target.value;
+    } else if(ev.target.id==="email"){
+      authEmail=ev.target.value;
+    } else if(ev.target.id==="pass"){
+      authPass=ev.target.value;
     }
   });
 
@@ -459,8 +538,44 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     if(d) draft.text=d.value;
     var ci=document.getElementById("cmin");
     if(ci) timer.cval=ci.value;
+    var em=document.getElementById("email");
+    if(em) authEmail=em.value;
+    var pw=document.getElementById("pass");
+    if(pw) authPass=pw.value;
 
-    if(a==="nav"){ screen=el.getAttribute("data-to"); flash=""; render(); }
+    if(a==="auth-toggle"){
+      authMode=(authMode==="signup"?"signin":"signup");
+      authMsg=""; render();
+    }
+    else if(a==="auth-submit"){
+      if(!sb) return;
+      var email=(authEmail||"").replace(/^\s+|\s+$/g,"");
+      var pass=authPass||"";
+      if(!email || !pass){ authMsg="Enter your email and password."; render(); return; }
+      authBusy=true; authMsg=""; render();
+      if(authMode==="signup"){
+        sb.auth.signUp({email:email,password:pass}).then(function(res){
+          authBusy=false;
+          if(res.error){ authMsg=res.error.message; render(); return; }
+          if(res.data && res.data.session){ render(); }
+          else {
+            authMode="signin"; authPass="";
+            authMsg="Check your email to confirm your account, then sign in.";
+            render();
+          }
+        });
+      } else {
+        sb.auth.signInWithPassword({email:email,password:pass}).then(function(res){
+          authBusy=false;
+          if(res.error){ authMsg=res.error.message; render(); return; }
+          render();
+        });
+      }
+    }
+    else if(a==="signout"){
+      if(sb) sb.auth.signOut();
+    }
+    else if(a==="nav"){ screen=el.getAttribute("data-to"); flash=""; render(); }
     else if(a==="chip"){
       var dim=el.getAttribute("data-dim"), val=el.getAttribute("data-val");
       if(el.getAttribute("data-multi")==="1"){
@@ -472,22 +587,38 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       render();
     }
     else if(a==="add"){
-      if(!canAdd()) return;
+      if(!canAdd() || !sb || !user) return;
       var v=(draft.text||"").replace(/^\s+|\s+$/g,"");
-      tasks.unshift({id:uid(),text:v,priority:draft.p,urgency:draft.u,
-                     energy:draft.e,time:draft.t,context:draft.c,done:false,createdAt:Date.now()});
-      draft.text=""; draft.p=""; draft.u=""; draft.e=""; draft.t=""; draft.c="";
-      save(); render();
-      var nd=document.getElementById("dump"); if(nd) nd.focus();
+      var row={text:v,priority:draft.p,urgency:draft.u,
+               energy:draft.e,time:draft.t,context:draft.c,done:false,user_id:user.id};
+      el.setAttribute("disabled","");
+      sb.from("tasks").insert(row).select().single().then(function(res){
+        if(res.error){ flash="Couldn't save: "+res.error.message; render(); return; }
+        tasks.unshift(normalize(res.data));
+        draft.text=""; draft.p=""; draft.u=""; draft.e=""; draft.t=""; draft.c="";
+        flash=""; render();
+        var nd=document.getElementById("dump"); if(nd) nd.focus();
+      });
     }
     else if(a==="del"){
       var id=el.getAttribute("data-id");
-      tasks=tasks.filter(function(t){ return t.id!==id; });
-      save(); render();
+      if(!sb) return;
+      sb.from("tasks").delete().eq("id",id).then(function(res){
+        if(res.error){ flash="Couldn't delete: "+res.error.message; render(); return; }
+        tasks=tasks.filter(function(t){ return String(t.id)!==String(id); });
+        render();
+      });
     }
     else if(a==="go-choose"){ screen="choose"; flash=""; render(); }
     else if(a==="sec"){
       var sc=el.getAttribute("data-sec");
+      if(sc==="deal"){
+        var td=pickOne(openTasks(),null);
+        if(!td) return;
+        method="deal";
+        activeId=td.id; screen="focus"; timer.custom=false; resetTimer(); render();
+        return;
+      }
       openSec=(openSec===sc?"":sc);
       render();
     }
@@ -517,7 +648,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     else if(a==="setcustom"){
       var n=parseInt(timer.cval,10);
       if(!isNaN(n) && n>0 && n<=600){
-        timer.mins=n; resetTimer(); save();
+        timer.mins=n; resetTimer(); saveMins();
       }
       timer.custom=false; render();
     }
@@ -525,14 +656,19 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     else if(a==="reset"){ resetTimer(); render(); }
     else if(a==="done"){
       var did=activeId;
-      tasks=tasks.map(function(t){
-        if(t.id!==did) return t;
-        t.done=true; t.doneAt=Date.now(); return t;
-      });
-      save(); stopTimer(); activeId=null; screen="choose";
+      if(!sb) return;
+      stopTimer(); activeId=null; screen="choose";
       flash="Done. That is one less.";
       render();
-      setTimeout(function(){ flash=""; if(screen==="choose") render(); },2800);
+      sb.from("tasks").update({done:true}).eq("id",did).then(function(res){
+        if(res.error){ flash="Couldn't mark done: "+res.error.message; render(); return; }
+        tasks=tasks.map(function(t){
+          if(String(t.id)!==String(did)) return t;
+          t.done=true; t.doneAt=Date.now(); return t;
+        });
+        render();
+        setTimeout(function(){ flash=""; if(screen==="choose") render(); },2800);
+      });
     }
     else if(a==="another"){
       var pool=(method==="filter")?matching():openTasks();
@@ -546,8 +682,36 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     else if(a==="back"){ stopTimer(); activeId=null; screen="choose"; render(); }
   });
 
-  load();
+  function applySession(s){
+    var u = (s && s.user) ? s.user : null;
+    var newId = u ? u.id : null;
+    if(newId===authedId) return;
+    authedId=newId;
+    user=u;
+    authEmail=""; authPass=""; authMsg=""; authBusy=false; flash="";
+    if(u){
+      booting=true; render();
+      loadTasks().then(function(){ booting=false; render(); })
+                 .catch(function(err){ booting=false; flash="Couldn't load tasks: "+errmsg(err); render(); });
+    } else {
+      tasks=[]; screen="collect"; activeId=null; booting=false; render();
+    }
+  }
+
+  loadMins();
   render();
+  if(!sb){
+    booting=false;
+    authMsg="Supabase client failed to load (check your connection).";
+    render();
+  } else {
+    sb.auth.onAuthStateChange(function(_e,s){ setTimeout(function(){ applySession(s); },0); });
+    sb.auth.getSession().then(function(res){
+      applySession(res && res.data ? res.data.session : null);
+    }).catch(function(err){
+      booting=false; authMsg="Auth error: "+errmsg(err); render();
+    });
+  }
 })();
 </script>
 </body>
