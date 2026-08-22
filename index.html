@@ -43,6 +43,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 .dial{display:flex;align-items:center;gap:10px;margin-top:14px;}
 .dial .lbl{width:72px;flex:none;white-space:nowrap;}
 .chips{flex:1;min-width:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.chips.two{grid-template-columns:repeat(2,1fr);}
 .chip{
   display:flex;align-items:center;justify-content:center;text-align:center;
   width:100%;min-height:40px;padding:9px 4px;border-radius:999px;
@@ -143,14 +144,15 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   var KEY="onething:v1";
   var LEVELS=["low","med","high"];
   var TIMES=["quick","med","long"];
+  var CONTEXTS=["personal","work"];
   var RANK={low:1,med:2,high:3};
   var TICKS=60, CX=88, CY=88, RIN=68, ROUT=82;
   var ON="#141B1A", OFF="rgba(20,27,26,.16)";
 
   var tasks=[];
   var screen="collect", activeId=null, method="deal", openSec="feel", flash="";
-  var draft={text:"",p:"med",u:"med",e:"med",t:"med"};
-  var filters={priority:[],urgency:[],energy:[],time:[]};
+  var draft={text:"",p:"",u:"",e:"",t:"",c:""};
+  var filters={priority:[],urgency:[],energy:[],time:[],context:[]};
   var timer={mins:5,left:300,run:false,rang:false,iv:null,custom:false,cval:"",lastLit:-1};
 
   function esc(s){
@@ -161,6 +163,9 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   function uid(){ return Math.random().toString(36).slice(2,10); }
   function openTasks(){ return tasks.filter(function(t){ return !t.done; }); }
   function tof(t){ return t.time || "med"; }
+  function canAdd(){
+    return !!(draft.text.replace(/\s/g,"") && draft.p && draft.u && draft.e && draft.t && draft.c);
+  }
 
   function load(){
     try{
@@ -168,7 +173,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       if(!raw) return;
       var d = JSON.parse(raw);
       if(d && d.tasks){
-        tasks = d.tasks.map(function(t){ if(!t.time) t.time="med"; return t; });
+        tasks = d.tasks.map(function(t){ if(!t.time) t.time="med"; if(!t.context) t.context="work"; return t; });
       }
       var m = parseInt(d && d.mins,10);
       if(!isNaN(m) && m>0 && m<=600){ timer.mins=m; timer.left=m*60; }
@@ -187,7 +192,8 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       return (!filters.priority.length||filters.priority.indexOf(t.priority)>-1)
           && (!filters.urgency.length||filters.urgency.indexOf(t.urgency)>-1)
           && (!filters.energy.length||filters.energy.indexOf(t.energy)>-1)
-          && (!filters.time.length||filters.time.indexOf(tof(t))>-1);
+          && (!filters.time.length||filters.time.indexOf(tof(t))>-1)
+          && (!filters.context.length||filters.context.indexOf(t.context||"work")>-1);
     });
   }
   function pickOne(list,skip){
@@ -202,7 +208,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 
   function chips(label,dim,val,multi,scale){
     var levels=scale||LEVELS;
-    var h='<div class="dial"><span class="lbl">'+label+'</span><div class="chips">';
+    var h='<div class="dial"><span class="lbl">'+label+'</span><div class="chips'+(levels.length===2?" two":"")+'">';
     for(var i=0;i<levels.length;i++){
       var l=levels[i];
       var on=multi?(val.indexOf(l)>-1):(val===l);
@@ -221,7 +227,8 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       +chips("Urgency","u",draft.u,false,LEVELS)
       +chips("Energy","e",draft.e,false,LEVELS)
       +chips("Time","t",draft.t,false,TIMES)
-      +'<button class="btn" data-act="add"'+(draft.text.replace(/\s/g,"")?"":" disabled")+'>Add it</button>'
+      +chips("Context","c",draft.c,false,CONTEXTS)
+      +'<button class="btn" data-act="add"'+(canAdd()?"":" disabled")+'>Add it</button>'
       +'<div class="rule"></div>'
       +'<span class="lbl">'+(o.length?("The pile &mdash; "+o.length):"The pile")+'</span>';
     if(!o.length){
@@ -260,6 +267,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
             +chips("Urgency","urgency",filters.urgency,true,LEVELS)
             +chips("Energy","energy",filters.energy,true,LEVELS)
             +chips("Time","time",filters.time,true,TIMES)
+            +chips("Context","context",filters.context,true,CONTEXTS)
             +'<button class="btn" data-act="show-one"'+(m.length?"":" disabled")+'>'
             +(m.length?("Show me one &mdash; "+m.length+" match"):"Nothing matches that")
             +'</button>';
@@ -433,7 +441,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       draft.text=ev.target.value;
       var b=document.querySelector('[data-act="add"]');
       if(b){
-        if(draft.text.replace(/\s/g,"")) b.removeAttribute("disabled");
+        if(canAdd()) b.removeAttribute("disabled");
         else b.setAttribute("disabled","");
       }
     } else if(ev.target.id==="cmin"){
@@ -464,11 +472,11 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       render();
     }
     else if(a==="add"){
+      if(!canAdd()) return;
       var v=(draft.text||"").replace(/^\s+|\s+$/g,"");
-      if(!v) return;
       tasks.unshift({id:uid(),text:v,priority:draft.p,urgency:draft.u,
-                     energy:draft.e,time:draft.t,done:false,createdAt:Date.now()});
-      draft.text=""; draft.p="med"; draft.u="med"; draft.e="med"; draft.t="med";
+                     energy:draft.e,time:draft.t,context:draft.c,done:false,createdAt:Date.now()});
+      draft.text=""; draft.p=""; draft.u=""; draft.e=""; draft.t=""; draft.c="";
       save(); render();
       var nd=document.getElementById("dump"); if(nd) nd.focus();
     }
