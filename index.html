@@ -30,7 +30,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
 .bar{display:flex;align-items:center;padding:4px 0 30px;}
 .tally{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--stone);padding:8px 0;}
 .tally.on{color:var(--ink);font-weight:800;}
-.burger{margin-left:auto;font-size:22px;line-height:1;color:var(--ink);padding:4px 6px;}
+.backbtn{font-size:20px;line-height:1;color:var(--ink);padding:4px 10px 4px 0;}
+.newbtn{margin-left:auto;font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--ink);padding:8px 0;}
+.burger{margin-left:14px;font-size:22px;line-height:1;color:var(--ink);padding:4px 6px;}
+.burger.pushright{margin-left:auto;}
 .menuwrap{position:fixed;inset:0;z-index:9998;}
 .menuback{position:absolute;inset:0;}
 .menu{position:absolute;top:14px;right:16px;min-width:232px;background:#E6E9E3;
@@ -85,6 +88,13 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 .row{display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid rgba(110,122,118,.16);}
 .row .txt{flex:1;font-size:.98rem;font-weight:500;line-height:1.32;letter-spacing:-.01em;}
 .tags{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);margin-top:6px;font-weight:700;}
+.metrics{display:flex;flex-wrap:wrap;gap:10px 9px;margin-top:10px;}
+.metric{display:flex;flex-direction:column;align-items:center;gap:5px;}
+.mlabel{font-size:9px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--stone);text-align:center;}
+.mpill{display:inline-flex;align-items:center;justify-content:center;
+  width:80px;min-height:30px;padding:5px 6px;
+  background:transparent;border:1px solid rgba(20,27,26,.4);color:var(--ink);
+  border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.01em;}
 .x{color:var(--stone);font-size:22px;line-height:1;padding:2px 6px;flex:none;}
 
 .opt{border-top:1px solid rgba(110,122,118,.2);}
@@ -199,6 +209,16 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     return !!(draft.text.replace(/\s/g,"") && draft.p && draft.u && draft.e && draft.t && draft.c);
   }
   function errmsg(e){ return (e && e.message) ? e.message : String(e); }
+  function metricPills(t){
+    var items=[["Priority",t.priority],["Urgency",t.urgency],["Energy",t.energy],
+               ["Time",tof(t)],["Context",t.context||"work"]];
+    var h='<div class="metrics">';
+    for(var i=0;i<items.length;i++){
+      h+='<div class="metric"><span class="mlabel">'+items[i][0]+'</span>'
+        +'<span class="mpill">'+esc(items[i][1])+'</span></div>';
+    }
+    return h+'</div>';
+  }
 
   // The timer's last-used duration is a local preference, not a task, so it
   // still lives in localStorage. Tasks now live in Supabase.
@@ -296,7 +316,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 
   function pileView(){
     var o=openTasks();
-    var h='<h1 class="h">The pile'+(o.length?(" &mdash; "+o.length):"")+'</h1>'
+    var h='<h1 class="h">The pile'+(o.length?(" &mdash; "+o.length+" "+(o.length===1?"task":"tasks")):"")+'</h1>'
       +'<button class="btn ghost" style="margin-top:0" data-act="go-choose"'+(o.length?"":" disabled")+'>Choose task</button>';
     if(!o.length){
       h+='<p class="empty" style="margin-top:20px">Nothing here yet. Add something first.</p>';
@@ -305,9 +325,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     h+='<div class="pilescroll">';
     for(var i=0;i<o.length;i++){
       var t=o[i];
-      h+='<div class="row"><div class="txt">'+esc(t.text)
-        +'<div class="tags">'+t.priority+' pri &middot; '+t.urgency+' urg &middot; '
-        +t.energy+' nrg &middot; '+tof(t)+'</div></div>'
+      h+='<div class="row"><div class="txt">'+esc(t.text)+metricPills(t)+'</div>'
         +'<button class="x" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
     }
     h+='</div>';
@@ -418,7 +436,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   function focusView(t){
     var h='<div class="stage" style="background-color:#E6E9E3;color:#141B1A">'
       +'<div class="stagein">'
-      +'<div class="top"><button data-act="back" style="color:rgba(20,27,26,.5)">&larr; all tasks</button></div>'
+      +'<div class="top"><button data-act="hist-back" style="color:rgba(20,27,26,.5)">&larr; all tasks</button></div>'
       +'<div class="mid"><h1 class="task" style="color:#141B1A">'+esc(t.text)+'</h1></div>'
       +'<div class="tprop">'
       +'<div class="timerbox">'
@@ -484,9 +502,12 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       return x.done && x.doneAt && new Date(x.doneAt).toDateString()===today;
     }).length;
 
+    var notCollect=screen!=="collect";
     var h='<div class="wrap"><div class="bar">'
+      +(notCollect?'<button class="backbtn" data-act="hist-back" aria-label="Back">&#8592;</button>':'')
       +(doneToday?('<button class="tally'+(screen==="done"?" on":"")+'" data-act="nav" data-to="done">'+doneToday+' done today</button>'):'')
-      +'<button class="burger" data-act="menu-toggle" aria-label="Menu" aria-expanded="'+menuOpen+'">&#9776;</button>'
+      +(notCollect?'<button class="newbtn" data-act="nav" data-to="collect">+ New</button>':'')
+      +'<button class="burger'+(notCollect?"":" pushright")+'" data-act="menu-toggle" aria-label="Menu" aria-expanded="'+menuOpen+'">&#9776;</button>'
       +'</div>';
     if(flash) h+='<p class="empty" style="margin:-12px 0 24px">'+esc(flash)+'</p>';
     h+=(screen==="collect"?collectView():screen==="pile"?pileView():screen==="done"?doneView():chooseView())+'</div>';
@@ -509,6 +530,15 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
         '<div class="wrap"><h1 class="h">Something broke.</h1>'
         +'<p class="empty">'+esc(err && err.message ? err.message : String(err))+'</p></div>';
     }
+  }
+
+  function setScreen(scr,id){
+    screen=scr;
+    if(id!==undefined) activeId=id;
+    menuOpen=false;
+    if(scr!=="focus") stopTimer();
+    try{ history.pushState({screen:screen,activeId:activeId},""); }catch(e){}
+    render();
   }
 
   function stopTimer(){ timer.run=false; if(timer.iv){ clearInterval(timer.iv); timer.iv=null; } }
@@ -608,7 +638,8 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     }
     else if(a==="menu-toggle"){ menuOpen=!menuOpen; render(); }
     else if(a==="menu-close"){ menuOpen=false; render(); }
-    else if(a==="nav"){ screen=el.getAttribute("data-to"); flash=""; menuOpen=false; render(); }
+    else if(a==="hist-back"){ try{ history.back(); }catch(e){} }
+    else if(a==="nav"){ flash=""; setScreen(el.getAttribute("data-to")); }
     else if(a==="chip"){
       var dim=el.getAttribute("data-dim"), val=el.getAttribute("data-val");
       if(el.getAttribute("data-multi")==="1"){
@@ -642,15 +673,15 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
         render();
       });
     }
-    else if(a==="go-choose"){ screen="choose"; flash=""; render(); }
-    else if(a==="go-pile"){ screen="pile"; flash=""; render(); }
+    else if(a==="go-choose"){ flash=""; setScreen("choose"); }
+    else if(a==="go-pile"){ flash=""; setScreen("pile"); }
     else if(a==="sec"){
       var sc=el.getAttribute("data-sec");
       if(sc==="deal"){
         var td=pickOne(openTasks(),null);
         if(!td) return;
         method="deal";
-        activeId=td.id; screen="focus"; timer.custom=false; resetTimer(); render();
+        timer.custom=false; resetTimer(); setScreen("focus", td.id);
         return;
       }
       openSec=(openSec===sc?"":sc);
@@ -661,11 +692,11 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       var t1=pickOne(list,null);
       if(!t1) return;
       method=(a==="show-one")?"filter":"deal";
-      activeId=t1.id; screen="focus"; timer.custom=false; resetTimer(); render();
+      timer.custom=false; resetTimer(); setScreen("focus", t1.id);
     }
     else if(a==="pick"){
-      method="pick"; activeId=el.getAttribute("data-id");
-      screen="focus"; timer.custom=false; resetTimer(); render();
+      method="pick"; timer.custom=false; resetTimer();
+      setScreen("focus", el.getAttribute("data-id"));
     }
     else if(a==="toggle"){
       timer.rang=false;
@@ -691,9 +722,9 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     else if(a==="done"){
       var did=activeId;
       if(!sb) return;
-      stopTimer(); activeId=null; screen="choose";
+      stopTimer();
       flash="Done. That is one less.";
-      render();
+      setScreen("choose", null);
       var whenISO=new Date().toISOString();
       sb.from("tasks").update({done:true,done_at:whenISO}).eq("id",did).then(function(res){
         // Fall back if the done_at column hasn't been added to the table yet.
@@ -719,8 +750,17 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       var nx=pickOne(alt,null);
       if(!nx) return;
       activeId=nx.id; resetTimer(); render();
+      try{ history.replaceState({screen:"focus",activeId:activeId},""); }catch(e){}
     }
-    else if(a==="back"){ stopTimer(); activeId=null; screen="choose"; render(); }
+  });
+
+  window.addEventListener("popstate",function(ev){
+    var st=ev.state||{};
+    screen=st.screen||"collect";
+    activeId=st.activeId||null;
+    menuOpen=false;
+    if(screen==="focus") resetTimer(); else stopTimer();
+    render();
   });
 
   function applySession(s){
@@ -732,8 +772,12 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     authEmail=""; authPass=""; authMsg=""; authBusy=false; flash="";
     if(u){
       booting=true; render();
-      loadTasks().then(function(){ booting=false; render(); })
-                 .catch(function(err){ booting=false; flash="Couldn't load tasks: "+errmsg(err); render(); });
+      loadTasks().then(function(){
+        booting=false;
+        screen="collect"; activeId=null;
+        try{ history.replaceState({screen:"collect",activeId:null},""); }catch(e){}
+        render();
+      }).catch(function(err){ booting=false; flash="Couldn't load tasks: "+errmsg(err); render(); });
     } else {
       tasks=[]; screen="collect"; activeId=null; booting=false; render();
     }
