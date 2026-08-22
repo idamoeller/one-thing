@@ -27,8 +27,20 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
 .nav{display:flex;gap:22px;align-items:center;padding:4px 0 30px;}
 .nav button{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--stone);padding:8px 0;}
 .nav button.on{color:var(--ink);font-weight:800;}
-.tally{margin-left:auto;}
+.bar{display:flex;align-items:center;padding:4px 0 30px;}
+.tally{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--stone);padding:8px 0;}
 .tally.on{color:var(--ink);font-weight:800;}
+.burger{margin-left:auto;font-size:22px;line-height:1;color:var(--ink);padding:4px 6px;}
+.menuwrap{position:fixed;inset:0;z-index:9998;}
+.menuback{position:absolute;inset:0;}
+.menu{position:absolute;top:14px;right:16px;min-width:232px;background:#E6E9E3;
+  border:1px solid rgba(110,122,118,.25);border-radius:6px;padding:2px 18px;
+  box-shadow:0 10px 34px rgba(20,27,26,.14);}
+.menu button{display:block;width:100%;text-align:left;font-size:12px;letter-spacing:.16em;
+  text-transform:uppercase;font-weight:600;color:var(--stone);padding:15px 0;
+  border-bottom:1px solid rgba(110,122,118,.14);}
+.menu button:last-child{border-bottom:none;}
+.menu button.on{color:var(--ink);font-weight:800;}
 
 h1.h{font-size:clamp(1.7rem,7.5vw,2.35rem);font-weight:800;letter-spacing:-.03em;line-height:1.03;margin:0 0 28px;}
 .lbl{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--stone);}
@@ -58,6 +70,9 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   letter-spacing:.04em;padding:17px;border-radius:2px;margin-top:24px;transition:opacity .18s;}
 .btn[disabled]{opacity:.25;cursor:default;}
 .btn.ghost{background:transparent;color:#141B1A;border:1.5px solid #141B1A;margin-top:34px;}
+.pilebtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+.pilebtns .btn{margin-top:0;}
+.pilescroll{max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-top:20px;}
 
 .afield{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--mist-2);
   font-family:inherit;font-size:1.15rem;font-weight:500;color:var(--ink);
@@ -75,7 +90,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 .opt{border-top:1px solid rgba(110,122,118,.2);}
 .opt:last-of-type{border-bottom:1px solid rgba(110,122,118,.2);}
 .opt .head{width:100%;text-align:left;padding:23px 0;display:flex;align-items:baseline;gap:12px;}
-.opt h2{margin:0;font-size:1.22rem;font-weight:700;letter-spacing:-.02em;}
+.opt h2{margin:0;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);}
 .opt .hint{font-family:var(--serif);font-style:italic;font-size:.95rem;color:var(--stone);margin-left:auto;}
 .body{padding:0 0 26px;}
 .scroll{max-height:44vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
@@ -167,6 +182,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   var screen="collect", activeId=null, method="deal", openSec="feel", flash="";
   var booting=true;
   var user=null, authedId, authMode="signin", authEmail="", authPass="", authMsg="", authBusy=false;
+  var menuOpen=false;
   var draft={text:"",p:"",u:"",e:"",t:"",c:""};
   var filters={priority:[],urgency:[],energy:[],time:[],context:[]};
   var timer={mins:5,left:300,run:false,rang:false,iv:null,custom:false,cval:"",lastLit:-1};
@@ -202,7 +218,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       }
     }catch(e){}
   }
-  function normalize(t){ if(!t.time) t.time="med"; if(!t.context) t.context="work"; return t; }
+  function normalize(t){ if(!t.time) t.time="med"; if(!t.context) t.context="work"; if(!t.doneAt && t.done_at) t.doneAt=t.done_at; return t; }
   function loadTasks(){
     if(!sb) return Promise.reject(new Error("Supabase client failed to load (check your connection)."));
     return sb.from("tasks").select("*").order("created_at",{ascending:false})
@@ -271,13 +287,22 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       +chips("Time","t",draft.t,false,TIMES)
       +chips("Context","c",draft.c,false,CONTEXTS)
       +'<button class="btn" data-act="add"'+(canAdd()?"":" disabled")+'>Add it</button>'
-      +'<div class="rule"></div>'
-      +'<span class="lbl">'+(o.length?("The pile &mdash; "+o.length):"The pile")+'</span>';
+      +'<div class="pilebtns">'
+      +'<button class="btn ghost" data-act="go-pile"'+(o.length?"":" disabled")+'>View pile</button>'
+      +'<button class="btn ghost" data-act="go-choose"'+(o.length?"":" disabled")+'>Choose task</button>'
+      +'</div>';
+    return h;
+  }
+
+  function pileView(){
+    var o=openTasks();
+    var h='<h1 class="h">The pile'+(o.length?(" &mdash; "+o.length):"")+'</h1>'
+      +'<button class="btn ghost" style="margin-top:0" data-act="go-choose"'+(o.length?"":" disabled")+'>Choose task</button>';
     if(!o.length){
-      h+='<p class="empty" style="margin-top:14px">Nothing here yet. Type the first thing above.</p>';
+      h+='<p class="empty" style="margin-top:20px">Nothing here yet. Add something first.</p>';
       return h;
     }
-    h+='<div style="margin-top:8px">';
+    h+='<div class="pilescroll">';
     for(var i=0;i<o.length;i++){
       var t=o[i];
       h+='<div class="row"><div class="txt">'+esc(t.text)
@@ -285,7 +310,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
         +t.energy+' nrg &middot; '+tof(t)+'</div></div>'
         +'<button class="x" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
     }
-    h+='</div><button class="btn ghost" data-act="go-choose">Pick one to do</button>';
+    h+='</div>';
     return h;
   }
 
@@ -293,8 +318,8 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     var o=openTasks();
     if(!o.length){ return '<h1 class="h">Nothing left</h1>'; }
     var m=matching();
-    var secs=[["feel","By how it feels","match my capacity"],
-              ["pick","I already know","choose it myself"],
+    var secs=[["feel","Choose criteria","match my capacity"],
+              ["pick","Choose specific task","choose it myself"],
               ["deal","Dealer&#39;s choice","surprise me"]];
     var h='<h1 class="h">How should I pick?</h1>';
     for(var i=0;i<secs.length;i++){
@@ -329,18 +354,16 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     return h;
   }
 
+  function doneAtMs(t){ return t.doneAt ? new Date(t.doneAt).getTime() : 0; }
   function doneView(){
-    var today=new Date().toDateString();
-    var done=tasks.filter(function(x){
-      return x.done && x.doneAt && new Date(x.doneAt).toDateString()===today;
-    });
-    done.sort(function(a,b){ return b.doneAt-a.doneAt; });
-    var h='<h1 class="h">Done today</h1>';
+    var done=tasks.filter(function(x){ return x.done; });
+    done.sort(function(a,b){ return doneAtMs(b)-doneAtMs(a); });
+    var h='<h1 class="h">Completed</h1>';
     if(!done.length){
-      h+='<p class="empty">Nothing finished yet today.</p>';
+      h+='<p class="empty" style="margin-top:20px">Nothing completed yet.</p>';
       return h;
     }
-    h+='<div style="margin-top:8px">';
+    h+='<div class="pilescroll">';
     for(var i=0;i<done.length;i++){
       var t=done[i];
       h+='<div class="row"><div class="txt">'+esc(t.text)
@@ -461,14 +484,21 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       return x.done && x.doneAt && new Date(x.doneAt).toDateString()===today;
     }).length;
 
-    var h='<div class="wrap"><nav class="nav">'
-      +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
-      +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
+    var h='<div class="wrap"><div class="bar">'
       +(doneToday?('<button class="tally'+(screen==="done"?" on":"")+'" data-act="nav" data-to="done">'+doneToday+' done today</button>'):'')
-      +'<button class="signout" data-act="signout">Sign out</button>'
-      +'</nav>';
+      +'<button class="burger" data-act="menu-toggle" aria-label="Menu" aria-expanded="'+menuOpen+'">&#9776;</button>'
+      +'</div>';
     if(flash) h+='<p class="empty" style="margin:-12px 0 24px">'+esc(flash)+'</p>';
-    h+=(screen==="collect"?collectView():(screen==="done"?doneView():chooseView()))+'</div>';
+    h+=(screen==="collect"?collectView():screen==="pile"?pileView():screen==="done"?doneView():chooseView())+'</div>';
+    if(menuOpen){
+      h+='<div class="menuwrap"><div class="menuback" data-act="menu-close"></div><nav class="menu">'
+        +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
+        +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
+        +'<button class="'+(screen==="pile"?"on":"")+'" data-act="nav" data-to="pile">View all tasks</button>'
+        +'<button class="'+(screen==="done"?"on":"")+'" data-act="nav" data-to="done">View completed tasks</button>'
+        +'<button data-act="signout">Log out</button>'
+        +'</nav></div>';
+    }
     app.innerHTML=h;
   }
 
@@ -573,9 +603,12 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       }
     }
     else if(a==="signout"){
+      menuOpen=false;
       if(sb) sb.auth.signOut();
     }
-    else if(a==="nav"){ screen=el.getAttribute("data-to"); flash=""; render(); }
+    else if(a==="menu-toggle"){ menuOpen=!menuOpen; render(); }
+    else if(a==="menu-close"){ menuOpen=false; render(); }
+    else if(a==="nav"){ screen=el.getAttribute("data-to"); flash=""; menuOpen=false; render(); }
     else if(a==="chip"){
       var dim=el.getAttribute("data-dim"), val=el.getAttribute("data-val");
       if(el.getAttribute("data-multi")==="1"){
@@ -610,6 +643,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       });
     }
     else if(a==="go-choose"){ screen="choose"; flash=""; render(); }
+    else if(a==="go-pile"){ screen="pile"; flash=""; render(); }
     else if(a==="sec"){
       var sc=el.getAttribute("data-sec");
       if(sc==="deal"){
@@ -660,8 +694,15 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       stopTimer(); activeId=null; screen="choose";
       flash="Done. That is one less.";
       render();
-      sb.from("tasks").update({done:true}).eq("id",did).then(function(res){
-        if(res.error){ flash="Couldn't mark done: "+res.error.message; render(); return; }
+      var whenISO=new Date().toISOString();
+      sb.from("tasks").update({done:true,done_at:whenISO}).eq("id",did).then(function(res){
+        // Fall back if the done_at column hasn't been added to the table yet.
+        if(res.error && /done_at/i.test(res.error.message||"")){
+          return sb.from("tasks").update({done:true}).eq("id",did);
+        }
+        return res;
+      }).then(function(res){
+        if(res && res.error){ flash="Couldn't mark done: "+res.error.message; render(); return; }
         tasks=tasks.map(function(t){
           if(String(t.id)!==String(did)) return t;
           t.done=true; t.doneAt=Date.now(); return t;
