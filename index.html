@@ -88,13 +88,17 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 .row{display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid rgba(110,122,118,.16);}
 .row .txt{flex:1;font-size:.98rem;font-weight:500;line-height:1.32;letter-spacing:-.01em;}
 .tags{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);margin-top:6px;font-weight:700;}
-.metrics{display:flex;flex-wrap:wrap;gap:10px 9px;margin-top:10px;}
-.metric{display:flex;flex-direction:column;align-items:center;gap:5px;}
-.mlabel{font-size:9px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--stone);text-align:center;}
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:10px;}
+.metric{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;}
+.mlabel{font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;color:var(--stone);text-align:center;white-space:nowrap;}
 .mpill{display:inline-flex;align-items:center;justify-content:center;
-  width:80px;min-height:30px;padding:5px 6px;
+  width:100%;min-height:30px;padding:5px 3px;
   background:transparent;border:1px solid rgba(20,27,26,.4);color:var(--ink);
-  border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.01em;}
+  border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:.01em;cursor:pointer;white-space:nowrap;}
+.mpill.on{background-color:#141B1A;border-color:#141B1A;color:#E6E9E3;}
+.mopts{display:flex;flex-direction:column;gap:5px;}
+.setchips{display:flex;gap:8px;margin-top:8px;}
+.setchips .chip{flex:1;width:auto;padding-left:8px;padding-right:8px;}
 .x{color:var(--stone);font-size:22px;line-height:1;padding:2px 6px;flex:none;}
 
 .opt{border-top:1px solid rgba(110,122,118,.2);}
@@ -184,6 +188,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   var LEVELS=["low","med","high"];
   var TIMES=["quick","med","long"];
   var CONTEXTS=["personal","work"];
+  var WHENS=["now","future"];
   var RANK={low:1,med:2,high:3};
   var TICKS=60, CX=88, CY=88, RIN=68, ROUT=82;
   var ON="#141B1A", OFF="rgba(20,27,26,.16)";
@@ -193,8 +198,11 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   var booting=true;
   var user=null, authedId, authMode="signin", authEmail="", authPass="", authMsg="", authBusy=false;
   var menuOpen=false;
-  var draft={text:"",p:"",u:"",e:"",t:"",c:""};
-  var filters={priority:[],urgency:[],energy:[],time:[],context:[]};
+  var editPill=null;
+  var defaults={p:"",u:"",e:"",t:"",c:"work",w:"now"};
+  function freshDraft(){ return {text:"",p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w}; }
+  var draft=freshDraft();
+  var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[]};
   var timer={mins:5,left:300,run:false,rang:false,iv:null,custom:false,cval:"",lastLit:-1};
 
   function esc(s){
@@ -206,18 +214,58 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   function openTasks(){ return tasks.filter(function(t){ return !t.done; }); }
   function tof(t){ return t.time || "med"; }
   function canAdd(){
-    return !!(draft.text.replace(/\s/g,"") && draft.p && draft.u && draft.e && draft.t && draft.c);
+    return !!(draft.text.replace(/\s/g,"") && draft.p && draft.u && draft.e && draft.t && draft.c && draft.w);
   }
   function errmsg(e){ return (e && e.message) ? e.message : String(e); }
+  var DIMS=[["p","Priority",LEVELS,"priority"],["u","Urgency",LEVELS,"urgency"],
+            ["e","Energy",LEVELS,"energy"],["t","Time",TIMES,"time"],
+            ["c","Context",CONTEXTS,"context"],["w","When",WHENS,"horizon"]];
+  var DIMFIELD={p:"priority",u:"urgency",e:"energy",t:"time",c:"context",w:"horizon"};
+  function findTask(id){ for(var i=0;i<tasks.length;i++){ if(String(tasks[i].id)===String(id)) return tasks[i]; } return null; }
+  function dimDefaultVal(field){ return field==="time"?"med":field==="context"?"work":field==="horizon"?"now":""; }
+
   function metricPills(t){
-    var items=[["Priority",t.priority],["Urgency",t.urgency],["Energy",t.energy],
-               ["Time",tof(t)],["Context",t.context||"work"]];
     var h='<div class="metrics">';
-    for(var i=0;i<items.length;i++){
-      h+='<div class="metric"><span class="mlabel">'+items[i][0]+'</span>'
-        +'<span class="mpill">'+esc(items[i][1])+'</span></div>';
+    for(var i=0;i<DIMS.length;i++){
+      var key=DIMS[i][0], label=DIMS[i][1], opts=DIMS[i][2], field=DIMS[i][3];
+      var cur=t[field]||dimDefaultVal(field);
+      var editing=editPill && String(editPill.id)===String(t.id) && editPill.dim===key;
+      h+='<div class="metric"><span class="mlabel">'+label+'</span>';
+      if(editing){
+        h+='<div class="mopts">';
+        for(var j=0;j<opts.length;j++){
+          h+='<button class="mpill'+(opts[j]===cur?" on":"")+'" data-act="set-pill" data-id="'+t.id
+            +'" data-dim="'+key+'" data-val="'+opts[j]+'">'+opts[j]+'</button>';
+        }
+        h+='</div>';
+      } else {
+        h+='<button class="mpill" data-act="edit-pill" data-id="'+t.id+'" data-dim="'+key+'">'+esc(cur)+'</button>';
+      }
+      h+='</div>';
     }
     return h+'</div>';
+  }
+
+  function loadSettings(){
+    if(!sb || !user) return Promise.resolve();
+    return sb.from("settings").select("defaults").eq("user_id",user.id).maybeSingle().then(function(res){
+      if(res.error) return;
+      if(res.data && res.data.defaults){
+        var d=res.data.defaults||{};
+        var base={p:"",u:"",e:"",t:"",c:"work",w:"now"};
+        for(var k in d){ if(base.hasOwnProperty(k)) base[k]=d[k]; }
+        defaults=base;
+      }
+    }).catch(function(){});
+  }
+  function saveSettings(){
+    if(!sb || !user) return;
+    var payload={user_id:user.id,
+      defaults:{p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w},
+      updated_at:new Date().toISOString()};
+    sb.from("settings").upsert(payload).then(function(res){
+      if(res.error){ flash="Couldn't save settings: "+errmsg(res.error); render(); }
+    });
   }
 
   // The timer's last-used duration is a local preference, not a task, so it
@@ -254,7 +302,8 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
           && (!filters.urgency.length||filters.urgency.indexOf(t.urgency)>-1)
           && (!filters.energy.length||filters.energy.indexOf(t.energy)>-1)
           && (!filters.time.length||filters.time.indexOf(tof(t))>-1)
-          && (!filters.context.length||filters.context.indexOf(t.context||"work")>-1);
+          && (!filters.context.length||filters.context.indexOf(t.context||"work")>-1)
+          && (!filters.when.length||filters.when.indexOf(t.horizon||"now")>-1);
     });
   }
   function pickOne(list,skip){
@@ -306,6 +355,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       +chips("Energy","e",draft.e,false,LEVELS)
       +chips("Time","t",draft.t,false,TIMES)
       +chips("Context","c",draft.c,false,CONTEXTS)
+      +chips("When","w",draft.w,false,WHENS)
       +'<button class="btn" data-act="add"'+(canAdd()?"":" disabled")+'>Add it</button>'
       +'<div class="pilebtns">'
       +'<button class="btn ghost" data-act="go-pile"'+(o.length?"":" disabled")+'>View pile</button>'
@@ -353,6 +403,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
             +chips("Energy","energy",filters.energy,true,LEVELS)
             +chips("Time","time",filters.time,true,TIMES)
             +chips("Context","context",filters.context,true,CONTEXTS)
+            +chips("When","when",filters.when,true,WHENS)
             +'<button class="btn" data-act="show-one"'+(m.length?"":" disabled")+'>'
             +(m.length?("Show me one &mdash; "+m.length+" match"):"Nothing matches that")
             +'</button>';
@@ -389,6 +440,23 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
         +t.energy+' nrg &middot; '+tof(t)+' &middot; '+(t.context||"work")+'</div></div></div>';
     }
     h+='</div>';
+    return h;
+  }
+
+  function settingsView(){
+    var h='<h1 class="h">Settings</h1>'
+      +'<span class="lbl">Default pill for new tasks</span>'
+      +'<p class="empty" style="margin-top:8px">Pick a default for each, or &ldquo;None&rdquo; to choose every time.</p>';
+    for(var i=0;i<DIMS.length;i++){
+      var key=DIMS[i][0], label=DIMS[i][1], opts=DIMS[i][2];
+      var cur=defaults[key]||"";
+      h+='<div style="margin-top:22px"><span class="lbl">'+label+'</span><div class="setchips">'
+        +'<button class="chip'+(cur===""?" on":"")+'" data-act="set-default" data-dim="'+key+'" data-val="">None</button>';
+      for(var j=0;j<opts.length;j++){
+        h+='<button class="chip'+(cur===opts[j]?" on":"")+'" data-act="set-default" data-dim="'+key+'" data-val="'+opts[j]+'">'+opts[j]+'</button>';
+      }
+      h+='</div></div>';
+    }
     return h;
   }
 
@@ -510,13 +578,14 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       +'<button class="burger'+(notCollect?"":" pushright")+'" data-act="menu-toggle" aria-label="Menu" aria-expanded="'+menuOpen+'">&#9776;</button>'
       +'</div>';
     if(flash) h+='<p class="empty" style="margin:-12px 0 24px">'+esc(flash)+'</p>';
-    h+=(screen==="collect"?collectView():screen==="pile"?pileView():screen==="done"?doneView():chooseView())+'</div>';
+    h+=(screen==="collect"?collectView():screen==="pile"?pileView():screen==="done"?doneView():screen==="settings"?settingsView():chooseView())+'</div>';
     if(menuOpen){
       h+='<div class="menuwrap"><div class="menuback" data-act="menu-close"></div><nav class="menu">'
         +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
         +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
         +'<button class="'+(screen==="pile"?"on":"")+'" data-act="nav" data-to="pile">View all tasks</button>'
         +'<button class="'+(screen==="done"?"on":"")+'" data-act="nav" data-to="done">View completed tasks</button>'
+        +'<button class="'+(screen==="settings"?"on":"")+'" data-act="nav" data-to="settings">Settings</button>'
         +'<button data-act="signout">Log out</button>'
         +'</nav></div>';
     }
@@ -535,7 +604,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
   function setScreen(scr,id){
     screen=scr;
     if(id!==undefined) activeId=id;
-    menuOpen=false;
+    menuOpen=false; editPill=null;
     if(scr!=="focus") stopTimer();
     try{ history.pushState({screen:screen,activeId:activeId},""); }catch(e){}
     render();
@@ -602,6 +671,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     if(em) authEmail=em.value;
     var pw=document.getElementById("pass");
     if(pw) authPass=pw.value;
+    if(a!=="edit-pill" && a!=="set-pill" && editPill){ editPill=null; }
 
     if(a==="auth-toggle"){
       authMode=(authMode==="signup"?"signin":"signup");
@@ -654,12 +724,19 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
       if(!canAdd() || !sb || !user) return;
       var v=(draft.text||"").replace(/^\s+|\s+$/g,"");
       var row={text:v,priority:draft.p,urgency:draft.u,
-               energy:draft.e,time:draft.t,context:draft.c,done:false,user_id:user.id};
+               energy:draft.e,time:draft.t,context:draft.c,horizon:draft.w,done:false,user_id:user.id};
       el.setAttribute("disabled","");
       sb.from("tasks").insert(row).select().single().then(function(res){
-        if(res.error){ flash="Couldn't save: "+res.error.message; render(); return; }
+        // Fall back if the horizon column hasn't been added to the table yet.
+        if(res.error && /horizon/i.test(res.error.message||"")){
+          var r2={}; for(var k in row){ if(k!=="horizon") r2[k]=row[k]; }
+          return sb.from("tasks").insert(r2).select().single();
+        }
+        return res;
+      }).then(function(res){
+        if(res && res.error){ flash="Couldn't save: "+res.error.message; render(); return; }
         tasks.unshift(normalize(res.data));
-        draft.text=""; draft.p=""; draft.u=""; draft.e=""; draft.t=""; draft.c="";
+        draft=freshDraft();
         flash=""; render();
         var nd=document.getElementById("dump"); if(nd) nd.focus();
       });
@@ -675,6 +752,29 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     }
     else if(a==="go-choose"){ flash=""; setScreen("choose"); }
     else if(a==="go-pile"){ flash=""; setScreen("pile"); }
+    else if(a==="edit-pill"){
+      editPill={id:el.getAttribute("data-id"),dim:el.getAttribute("data-dim")};
+      render();
+    }
+    else if(a==="set-pill"){
+      var pid=el.getAttribute("data-id"), pdim=el.getAttribute("data-dim"), pval=el.getAttribute("data-val");
+      editPill=null;
+      var pf=DIMFIELD[pdim], pt=findTask(pid);
+      if(pt && pt[pf]!==pval && sb){
+        var pold=pt[pf]; pt[pf]=pval; render();
+        var upd={}; upd[pf]=pval;
+        sb.from("tasks").update(upd).eq("id",pid).then(function(res){
+          if(res.error){ pt[pf]=pold; flash="Couldn't update: "+res.error.message; render(); }
+        });
+      } else { render(); }
+    }
+    else if(a==="set-default"){
+      var ddim=el.getAttribute("data-dim");
+      defaults[ddim]=el.getAttribute("data-val");
+      if(!draft.text.replace(/\s/g,"")) draft=freshDraft();
+      saveSettings();
+      render();
+    }
     else if(a==="sec"){
       var sc=el.getAttribute("data-sec");
       if(sc==="deal"){
@@ -758,7 +858,7 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     var st=ev.state||{};
     screen=st.screen||"collect";
     activeId=st.activeId||null;
-    menuOpen=false;
+    menuOpen=false; editPill=null;
     if(screen==="focus") resetTimer(); else stopTimer();
     render();
   });
@@ -772,8 +872,9 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     authEmail=""; authPass=""; authMsg=""; authBusy=false; flash="";
     if(u){
       booting=true; render();
-      loadTasks().then(function(){
+      Promise.all([loadTasks(), loadSettings()]).then(function(){
         booting=false;
+        draft=freshDraft();
         screen="collect"; activeId=null;
         try{ history.replaceState({screen:"collect",activeId:null},""); }catch(e){}
         render();
