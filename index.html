@@ -129,22 +129,27 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 }
 .top{display:flex;justify-content:flex-end;}
 .top button{font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:rgba(20,27,26,.5);padding:8px 2px;}
-.mid{flex:1;display:flex;flex-direction:column;justify-content:center;padding:22px 0;min-height:130px;}
+.mid{flex:1;display:flex;flex-direction:column;justify-content:center;padding:10px 0;min-height:80px;}
 .task{
   color:#141B1A;text-align:center;
-  font-size:clamp(2.5rem,12.5vw,4.6rem);font-weight:800;
-  letter-spacing:-.04em;line-height:1.03;margin:0;
+  font-size:clamp(2.3rem,11vw,4rem);font-weight:600;
+  letter-spacing:-.03em;line-height:1.05;margin:0;
   overflow-wrap:break-word;word-wrap:break-word;
 }
 
-.tprop{display:flex;flex-direction:column;align-items:center;gap:18px;}
-.timerbox{position:relative;width:176px;height:176px;}
-.timerbox svg{display:block;width:176px;height:176px;}
-.clock{
-  position:absolute;left:0;top:0;width:176px;height:176px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:33px;font-weight:700;letter-spacing:.01em;color:#141B1A;
-}
+.tprop{display:flex;flex-direction:column;align-items:center;gap:30px;margin-top:38px;}
+.timerbox{position:relative;width:264px;height:264px;}
+.timerbox svg{display:block;width:264px;height:264px;}
+.clock{position:absolute;left:0;top:0;width:264px;height:264px;display:flex;align-items:center;justify-content:center;}
+.cnum{text-align:center;font-size:52px;font-weight:700;letter-spacing:.01em;color:#141B1A;cursor:pointer;line-height:1;}
+.editwrap{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.cinput{width:150px;text-align:center;font-size:44px;font-weight:700;color:#141B1A;background:transparent;border:none;border-bottom:2px solid var(--ink);padding:0 0 4px;}
+.cinput:focus{outline:none;}
+.subhint{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:rgba(20,27,26,.4);}
+.playbtn{display:flex;align-items:center;justify-content:center;width:74px;height:74px;border:1.5px solid #141B1A;border-radius:999px;}
+.complete{display:flex;align-items:center;justify-content:center;width:100%;max-width:340px;min-height:62px;border-radius:14px;background:transparent;border:1.5px solid #141B1A;color:#141B1A;font-size:15px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;transition:transform .12s ease;}
+.complete:active{transform:scale(.98);}
+.elsebtn{margin-top:2px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:rgba(20,27,26,.5);padding:8px 2px;}
 .tset{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;width:100%;max-width:270px;}
 .tcustom{display:grid;grid-template-columns:1fr auto auto;gap:8px;width:100%;max-width:270px;}
 .tbtn{
@@ -170,10 +175,12 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
 .foot{display:flex;gap:30px;justify-content:center;margin-top:32px;}
 .foot button{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:rgba(20,27,26,.55);padding:11px 2px;}
 .foot button.key{color:#141B1A;}
+#cf{position:fixed;inset:0;pointer-events:none;z-index:9999;}
 </style>
 </head>
 <body>
 <div id="app"><div class="wrap"><p class="empty">Starting...</p></div></div>
+<canvas id="cf"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -501,47 +508,34 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     }
   }
 
+  function timerIcon(){
+    if(timer.rang) return '<svg width="32" height="32" viewBox="0 0 40 40"><path d="M20 9 a11 11 0 1 1 -8 3.5" fill="none" stroke="#141B1A" stroke-width="2.6" stroke-linecap="round"/><path d="M11 7 l0.6 6 l6 -0.6" fill="none" stroke="#141B1A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    if(timer.run) return '<svg width="30" height="30" viewBox="0 0 40 40"><rect x="13" y="10" width="5" height="20" fill="none" stroke="#141B1A" stroke-width="2.4"/><rect x="22" y="10" width="5" height="20" fill="none" stroke="#141B1A" stroke-width="2.4"/></svg>';
+    return '<svg width="42" height="42" viewBox="0 0 40 40"><polygon points="14,10 34,20 14,30" fill="none" stroke="#141B1A" stroke-width="2.4" stroke-linejoin="round"/></svg>';
+  }
+
   function focusView(t){
     var h='<div class="stage" style="background-color:#E6E9E3;color:#141B1A">'
       +'<div class="stagein">'
       +'<div class="top"><button data-act="hist-back" style="color:rgba(20,27,26,.5)">&larr; all tasks</button></div>'
       +'<div class="mid"><h1 class="task" style="color:#141B1A">'+esc(t.text)+'</h1></div>'
       +'<div class="tprop">'
-      +'<div class="timerbox">'
-      +'<svg viewBox="0 0 176 176" aria-hidden="true">'+ticksSVG()+'</svg>'
-      +'<div class="clock" id="clock" style="color:#141B1A">'+clockText()+'</div>'
-      +'</div>';
-
+      +'<div class="timerbox"><svg viewBox="0 0 176 176" aria-hidden="true">'+ticksSVG()+'</svg>'
+      +'<div class="clock">';
     if(timer.custom){
-      h+='<div class="tcustom">'
-        +'<input class="cin" id="cmin" type="number" inputmode="numeric" min="1" max="600"'
-        +' placeholder="minutes" value="'+esc(timer.cval)+'" aria-label="Minutes">'
-        +'<button class="tbtn on" data-act="setcustom"'
-        +' style="background-color:#141B1A;border-color:#141B1A;color:#E6E9E3">Set</button>'
-        +'<button class="tbtn" data-act="cancelcustom" aria-label="Cancel"'
-        +' style="color:rgba(20,27,26,.72)">&times;</button>'
-        +'</div>';
+      h+='<div class="editwrap">'
+        +'<input class="cinput" id="cmin" type="number" inputmode="numeric" min="1" max="600"'
+        +' placeholder="min" value="'+esc(timer.cval)+'" aria-label="Minutes">'
+        +'<span class="subhint">minutes &middot; enter</span></div>';
     } else {
-      h+='<div class="tset">'
-        +'<button class="tbtn on" data-act="uselast" data-min="'+timer.mins+'"'
-        +' style="background-color:#141B1A;border-color:#141B1A;color:#E6E9E3">'
-        +timer.mins+' min</button>'
-        +'<button class="tbtn" data-act="custom" style="color:rgba(20,27,26,.72)">Custom</button>'
-        +'</div>';
+      h+='<button class="cnum" id="clock" data-act="custom">'+clockText()+'</button>';
     }
-
-    if(timer.rang){
-      h+='<p class="note">Time. Stretch, then decide.</p>'
-        +'<button class="run" data-act="reset" style="color:#141B1A">Start again</button>';
-    } else if(timer.run){
-      h+='<button class="run" data-act="toggle" style="color:#141B1A">Pause</button>';
-    } else {
-      h+='<button class="run go" data-act="toggle"'
-        +' style="background-color:#141B1A;color:#E6E9E3">Start</button>';
-    }
-    h+='</div><div class="foot">'
-      +'<button class="key" data-act="done" style="color:#141B1A">Done</button>'
-      +'<button data-act="another" style="color:rgba(20,27,26,.55)">Something else</button>'
+    h+='</div></div>'
+      +'<button class="playbtn" data-act="'+(timer.rang?"reset":"toggle")+'"'
+      +' aria-label="'+(timer.run?"Pause":(timer.rang?"Start again":"Start"))+'">'+timerIcon()+'</button>';
+    if(timer.rang) h+='<p class="note">Time. Stretch, then decide.</p>';
+    h+='<button class="complete" data-act="done">Complete!</button>'
+      +'<button class="elsebtn" data-act="another">Something else</button>'
       +'</div></div></div>';
     return h;
   }
@@ -639,6 +633,39 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     }catch(e){}
   }
 
+  function applyCustom(){
+    var ci=document.getElementById("cmin");
+    if(ci) timer.cval=ci.value;
+    var n=parseInt(timer.cval,10);
+    if(!isNaN(n) && n>0 && n<=600){ timer.mins=n; resetTimer(); saveMins(); }
+    timer.custom=false; render();
+  }
+  function confettiBurst(){
+    var cvs=document.getElementById("cf"); if(!cvs || !cvs.getContext) return;
+    var ctx=cvs.getContext("2d");
+    cvs.width=window.innerWidth; cvs.height=window.innerHeight;
+    var colors=["#141B1A","#C9A227","#4C9A6A","#C25B4E","#3B6FB0","#D98C3F"];
+    var parts=[], ox=window.innerWidth/2, oy=window.innerHeight*0.4;
+    for(var i=0;i<180;i++){
+      var an=Math.random()*Math.PI*2, sp=Math.random()*8+3;
+      parts.push({x:ox,y:oy,vx:Math.cos(an)*sp,vy:Math.sin(an)*sp-7,g:0.16,
+        size:Math.random()*8+4,color:colors[i%colors.length],rot:Math.random()*6.28,vr:(Math.random()-0.5)*0.5});
+    }
+    function frame(){
+      ctx.clearRect(0,0,cvs.width,cvs.height);
+      var alive=false;
+      for(var i=0;i<parts.length;i++){
+        var p=parts[i];
+        p.vy+=p.g; p.vx*=0.99; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr;
+        if(p.y<cvs.height+30) alive=true;
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.fillStyle=p.color; ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*0.62); ctx.restore();
+      }
+      if(alive) requestAnimationFrame(frame); else ctx.clearRect(0,0,cvs.width,cvs.height);
+    }
+    requestAnimationFrame(frame);
+  }
+
   document.addEventListener("input",function(ev){
     if(!ev.target) return;
     if(ev.target.id==="dump"){
@@ -655,6 +682,13 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     } else if(ev.target.id==="pass"){
       authPass=ev.target.value;
     }
+  });
+
+  document.addEventListener("keydown",function(ev){
+    if(ev.target && ev.target.id==="cmin" && ev.key==="Enter"){ ev.preventDefault(); applyCustom(); }
+  });
+  document.addEventListener("focusout",function(ev){
+    if(ev.target && ev.target.id==="cmin" && timer.custom){ applyCustom(); }
   });
 
   document.addEventListener("click",function(ev){
@@ -806,25 +840,19 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
     }
     else if(a==="uselast"){ resetTimer(); render(); }
     else if(a==="custom"){
+      if(timer.run) return;
       timer.custom=true; timer.cval=String(timer.mins); render();
       var inp=document.getElementById("cmin");
       if(inp){ try{ inp.focus(); inp.select(); }catch(e){} }
     }
-    else if(a==="setcustom"){
-      var n=parseInt(timer.cval,10);
-      if(!isNaN(n) && n>0 && n<=600){
-        timer.mins=n; resetTimer(); saveMins();
-      }
-      timer.custom=false; render();
-    }
+    else if(a==="setcustom"){ applyCustom(); }
     else if(a==="cancelcustom"){ timer.custom=false; render(); }
     else if(a==="reset"){ resetTimer(); render(); }
     else if(a==="done"){
       var did=activeId;
       if(!sb) return;
       stopTimer();
-      flash="Done. That is one less.";
-      setScreen("choose", null);
+      confettiBurst();
       var whenISO=new Date().toISOString();
       sb.from("tasks").update({done:true,done_at:whenISO}).eq("id",did).then(function(res){
         // Fall back if the done_at column hasn't been added to the table yet.
@@ -833,14 +861,20 @@ textarea.dump:focus{outline:none;border-bottom-color:var(--ink);}
         }
         return res;
       }).then(function(res){
-        if(res && res.error){ flash="Couldn't mark done: "+res.error.message; render(); return; }
-        tasks=tasks.map(function(t){
-          if(String(t.id)!==String(did)) return t;
-          t.done=true; t.doneAt=Date.now(); return t;
-        });
-        render();
-        setTimeout(function(){ flash=""; if(screen==="choose") render(); },2800);
+        if(res && res.error){ flash="Couldn't mark done: "+res.error.message; }
+        else {
+          tasks=tasks.map(function(t){
+            if(String(t.id)!==String(did)) return t;
+            t.done=true; t.doneAt=Date.now(); return t;
+          });
+        }
+        if(screen==="choose") render();
       });
+      setTimeout(function(){
+        flash="Done. That is one less.";
+        setScreen("choose", null);
+        setTimeout(function(){ flash=""; if(screen==="choose") render(); },2800);
+      },1000);
     }
     else if(a==="another"){
       var pool=(method==="filter")?matching():openTasks();
