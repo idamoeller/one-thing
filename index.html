@@ -179,11 +179,15 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var TIMES=["quick","med","long"];
   var CONTEXTS=["personal","work"];
   var WHENS=["now","future"];
+  var CHOOSE_TITLES=["What's it going to be?","Which one now?","Pick your one thing",
+    "What deserves your focus?","Time to choose one","What are you doing next?",
+    "What's first?","What's calling you?","Pick the one","Ready to focus?","Where's your head at?"];
+  function rollChooseTitle(){ return CHOOSE_TITLES[Math.floor(Math.random()*CHOOSE_TITLES.length)]; }
   var RANK={low:1,med:2,high:3};
   var ARC_C=622.04; // 2π·99
 
   var tasks=[];
-  var screen="collect", activeId=null, method="deal", openSec="", flash="";
+  var screen="collect", activeId=null, method="deal", openSec="", flash="", chooseTitle=rollChooseTitle();
   var booting=true;
   var user=null, authedId, authMode="signin", authEmail="", authPass="", authMsg="", authBusy=false;
   var menuOpen=false;
@@ -382,7 +386,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var secs=[["deal","Dealer&#39;s choice","surprise me"],
               ["pick","Choose specific task","choose it myself"],
               ["feel","Choose criteria","match my capacity"]];
-    var h='<h1 class="h1">What&#39;s it going to be?</h1><div class="acc">';
+    var h='<h1 class="h1">'+esc(chooseTitle)+'</h1><div class="acc">';
     for(var i=0;i<secs.length;i++){
       var s=secs[i];
       h+='<section class="sec"><button class="sechead" data-act="sec" data-sec="'+s[0]+'"'
@@ -561,7 +565,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   function setScreen(scr,id){
     screen=scr;
     if(id!==undefined) activeId=id;
-    if(scr==="choose") openSec="";
+    if(scr==="choose"){ openSec=""; chooseTitle=rollChooseTitle(); }
     menuOpen=false; editPill=null; timer.editing=false;
     if(scr!=="focus") stopTimer();
     try{ history.pushState({screen:screen,activeId:activeId},""); }catch(e){}
