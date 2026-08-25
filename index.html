@@ -107,7 +107,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .dqlabel{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
 .dctx{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
 .scroll{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-.pickrow{display:block;width:100%;text-align:left;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;}
+.pickrow{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;}
 .pickrow:last-child{border-bottom:none;}
 .showone{margin-top:16px;}
 
@@ -183,7 +183,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var ARC_C=622.04; // 2π·99
 
   var tasks=[];
-  var screen="collect", activeId=null, method="deal", openSec="deal", flash="";
+  var screen="collect", activeId=null, method="deal", openSec="", flash="";
   var booting=true;
   var user=null, authedId, authMode="signin", authEmail="", authPass="", authMsg="", authBusy=false;
   var menuOpen=false;
@@ -399,7 +399,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           h+='<div class="scroll">';
           for(var j=0;j<o.length;j++){
             h+='<div class="pickrow" data-act="pick" data-id="'+o[j].id+'" role="button" tabindex="0">'
-              +'<div class="rowtitle">'+esc(o[j].text)+'</div>'+metricPills(o[j],true)+'</div>';
+              +'<div class="rowtxt"><div class="rowtitle">'+esc(o[j].text)+'</div>'+metricPills(o[j],true)+'</div>'
+              +'<button class="rowx" data-act="del" data-id="'+o[j].id+'" aria-label="Remove">&times;</button></div>';
           }
           h+='</div>';
         } else {
@@ -560,6 +561,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   function setScreen(scr,id){
     screen=scr;
     if(id!==undefined) activeId=id;
+    if(scr==="choose") openSec="";
     menuOpen=false; editPill=null; timer.editing=false;
     if(scr!=="focus") stopTimer();
     try{ history.pushState({screen:screen,activeId:activeId},""); }catch(e){}
