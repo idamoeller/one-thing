@@ -107,8 +107,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .dqlabel{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
 .dctx{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
 .scroll{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-.pickrow{display:block;width:100%;text-align:left;padding:14px 0;font-size:13px;font-weight:500;
-  letter-spacing:.02em;text-transform:uppercase;line-height:1.35;border-bottom:1px solid var(--hairline);}
+.pickrow{display:block;width:100%;text-align:left;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;}
 .pickrow:last-child{border-bottom:none;}
 .showone{margin-top:16px;}
 
@@ -383,7 +382,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var secs=[["deal","Dealer&#39;s choice","surprise me"],
               ["pick","Choose specific task","choose it myself"],
               ["feel","Choose criteria","match my capacity"]];
-    var h='<h1 class="h1">How should I pick?</h1><div class="acc">';
+    var h='<h1 class="h1">What&#39;s it going to be?</h1><div class="acc">';
     for(var i=0;i<secs.length;i++){
       var s=secs[i];
       h+='<section class="sec"><button class="sechead" data-act="sec" data-sec="'+s[0]+'"'
@@ -399,7 +398,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         } else if(s[0]==="pick"){
           h+='<div class="scroll">';
           for(var j=0;j<o.length;j++){
-            h+='<button class="pickrow" data-act="pick" data-id="'+o[j].id+'">'+esc(o[j].text)+'</button>';
+            h+='<div class="pickrow" data-act="pick" data-id="'+o[j].id+'" role="button" tabindex="0">'
+              +'<div class="rowtitle">'+esc(o[j].text)+'</div>'+metricPills(o[j],true)+'</div>';
           }
           h+='</div>';
         } else {
@@ -513,7 +513,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     }
 
     var active=null;
-    for(var i=0;i<tasks.length;i++){ if(tasks[i].id===activeId) active=tasks[i]; }
+    if(activeId!=null){ for(var i=0;i<tasks.length;i++){ if(String(tasks[i].id)===String(activeId)) active=tasks[i]; } }
     if(screen==="focus" && active){
       app.innerHTML=focusView(active);
       return;
