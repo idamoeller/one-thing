@@ -281,7 +281,12 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       }
     }catch(e){}
   }
-  function normalize(t){ if(!t.time) t.time="med"; if(!t.context) t.context="work"; if(!t.doneAt && t.done_at) t.doneAt=t.done_at; return t; }
+  function normalize(t){
+    if(!t.priority) t.priority="med"; if(!t.urgency) t.urgency="med"; if(!t.energy) t.energy="med";
+    if(!t.time) t.time="med"; if(!t.context) t.context="work"; if(!t.horizon) t.horizon="now";
+    if(!t.doneAt && t.done_at) t.doneAt=t.done_at;
+    return t;
+  }
   function loadTasks(){
     if(!sb) return Promise.reject(new Error("Supabase client failed to load (check your connection)."));
     return sb.from("tasks").select("*").order("created_at",{ascending:false})
@@ -618,6 +623,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 
   function confettiBurst(){
     var cvs=document.getElementById("cf"); if(!cvs || !cvs.getContext) return;
+    if(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches) return;
     var ctx=cvs.getContext("2d");
     cvs.width=window.innerWidth; cvs.height=window.innerHeight;
     var colors=["#101314","#C9A227","#4C9A6A","#C25B4E","#3B6FB0"];
@@ -661,7 +667,21 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   });
 
   document.addEventListener("keydown",function(ev){
-    if(ev.target && ev.target.id==="tmin" && ev.key==="Enter"){ ev.preventDefault(); commitTime(); }
+    if(ev.key==="Escape"){
+      if(timer.editing){ timer.editing=false; render(); return; }
+      if(menuOpen){ menuOpen=false; render(); return; }
+    }
+    if(ev.target && ev.target.id==="tmin" && ev.key==="Enter"){ ev.preventDefault(); commitTime(); return; }
+    // Enter/Space activate focusable role=button elements (timer face, pick rows)
+    if(ev.key==="Enter" || ev.key===" " || ev.key==="Spacebar"){
+      var t=ev.target;
+      if(t && t.getAttribute && t.getAttribute("data-act") && t.hasAttribute("tabindex")){
+        var tag=t.tagName;
+        if(tag!=="BUTTON" && tag!=="INPUT" && tag!=="TEXTAREA" && tag!=="A"){
+          ev.preventDefault(); t.click();
+        }
+      }
+    }
   });
 
   document.addEventListener("click",function(ev){
@@ -810,6 +830,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       render();
     }
     else if(a==="settime"){
+      stopTimer();
       timer.editing=true; timer.buf=String(timer.mins); render();
       var inp=document.getElementById("tmin");
       if(inp){ try{ inp.focus(); inp.select(); }catch(e){} }
@@ -844,8 +865,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     }
     else if(a==="another"){
       var pool=(method==="filter")?matching():openTasks();
-      var alt=pool.filter(function(t){ return t.id!==activeId; });
-      if(!alt.length) alt=openTasks().filter(function(t){ return t.id!==activeId; });
+      var alt=pool.filter(function(t){ return String(t.id)!==String(activeId); });
+      if(!alt.length) alt=openTasks().filter(function(t){ return String(t.id)!==String(activeId); });
       if(!alt.length){ flash="Nothing else in the pile."; render(); return; }
       var nx=pickOne(alt,null);
       if(!nx) return;
