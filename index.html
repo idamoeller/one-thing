@@ -208,7 +208,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   function tof(t){ return t.time || "med"; }
   function ctxOf(t){ return t.context || "work"; }
   function canAdd(){
-    return !!(draft.text.replace(/\s/g,"") && draft.p && draft.u && draft.e && draft.t && draft.c && draft.w);
+    return !!(draft.text.replace(/\s/g,""));
   }
   function errmsg(e){ return (e && e.message) ? e.message : String(e); }
   var DIMS=[["p","Priority",LEVELS,"priority"],["u","Urgency",LEVELS,"urgency"],
@@ -750,8 +750,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     else if(a==="add"){
       if(!canAdd() || !sb || !user) return;
       var v=(draft.text||"").replace(/^\s+|\s+$/g,"");
-      var row={text:v,priority:draft.p,urgency:draft.u,
-               energy:draft.e,time:draft.t,context:draft.c,horizon:draft.w,done:false,user_id:user.id};
+      var row={text:v,priority:draft.p||"med",urgency:draft.u||"med",
+               energy:draft.e||"med",time:draft.t||"med",context:draft.c||"work",
+               horizon:draft.w||"now",done:false,user_id:user.id};
       el.setAttribute("disabled","");
       sb.from("tasks").insert(row).select().single().then(function(res){
         if(res.error && /horizon/i.test(res.error.message||"")){
