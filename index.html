@@ -192,7 +192,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var user=null, authedId, authMode="signin", authEmail="", authPass="", authMsg="", authBusy=false;
   var menuOpen=false;
   var editPill=null;
-  var defaults={p:"",u:"",e:"",t:"",c:"work",w:"now"};
+  var defaults={p:"",u:"",e:"",t:"",c:"",w:""};
   function freshDraft(){ return {text:"",p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w}; }
   var draft=freshDraft();
   var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[]};
@@ -222,7 +222,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var h='<div class="pills">';
     for(var i=0;i<DIMS.length;i++){
       var key=DIMS[i][0], label=DIMS[i][1], opts=DIMS[i][2], field=DIMS[i][3];
-      var cur=t[field]||dimDefaultVal(field);
+      var cur=t[field]||"";
       var editing=!ro && editPill && String(editPill.id)===String(t.id) && editPill.dim===key;
       h+='<div class="pcol"><span class="plabel">'+label+'</span>';
       if(editing){
@@ -233,9 +233,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         }
         h+='</div>';
       } else if(ro){
-        h+='<span class="pval ro">'+esc(cur)+'</span>';
+        h+='<span class="pval ro">'+esc(cur||"—")+'</span>';
       } else {
-        h+='<button class="pval" data-act="edit-pill" data-id="'+t.id+'" data-dim="'+key+'">'+esc(cur)+'</button>';
+        h+='<button class="pval" data-act="edit-pill" data-id="'+t.id+'" data-dim="'+key+'">'+esc(cur||"—")+'</button>';
       }
       h+='</div>';
     }
@@ -248,7 +248,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       if(res.error) return;
       if(res.data && res.data.defaults){
         var d=res.data.defaults||{};
-        var base={p:"",u:"",e:"",t:"",c:"work",w:"now"};
+        var base={p:"",u:"",e:"",t:"",c:"",w:""};
         for(var k in d){ if(base.hasOwnProperty(k)) base[k]=d[k]; }
         defaults=base;
       }
@@ -281,12 +281,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       }
     }catch(e){}
   }
-  function normalize(t){
-    if(!t.priority) t.priority="med"; if(!t.urgency) t.urgency="med"; if(!t.energy) t.energy="med";
-    if(!t.time) t.time="med"; if(!t.context) t.context="work"; if(!t.horizon) t.horizon="now";
-    if(!t.doneAt && t.done_at) t.doneAt=t.done_at;
-    return t;
-  }
+  function normalize(t){ if(!t.doneAt && t.done_at) t.doneAt=t.done_at; return t; }
   function loadTasks(){
     if(!sb) return Promise.reject(new Error("Supabase client failed to load (check your connection)."));
     return sb.from("tasks").select("*").order("created_at",{ascending:false})
@@ -296,23 +291,21 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       });
   }
 
+  function inF(vals,v){ return !vals.length || !v || vals.indexOf(v)>-1; }
   function matching(){
     return openTasks().filter(function(t){
-      return (!filters.priority.length||filters.priority.indexOf(t.priority)>-1)
-          && (!filters.urgency.length||filters.urgency.indexOf(t.urgency)>-1)
-          && (!filters.energy.length||filters.energy.indexOf(t.energy)>-1)
-          && (!filters.time.length||filters.time.indexOf(tof(t))>-1)
-          && (!filters.context.length||filters.context.indexOf(ctxOf(t))>-1)
-          && (!filters.when.length||filters.when.indexOf(t.horizon||"now")>-1);
+      return inF(filters.priority,t.priority) && inF(filters.urgency,t.urgency)
+          && inF(filters.energy,t.energy) && inF(filters.time,t.time)
+          && inF(filters.context,t.context) && inF(filters.when,t.horizon);
     });
   }
   function pickOne(list,skip){
     var pool=list.filter(function(t){ return t.id!==skip; });
     if(!pool.length) pool=list;
     if(!pool.length) return null;
-    var scores=pool.map(function(t){ return RANK[t.priority]+RANK[t.urgency]; });
-    var best=Math.max.apply(null,scores);
-    var top=pool.filter(function(t){ return RANK[t.priority]+RANK[t.urgency]===best; });
+    function score(t){ return (RANK[t.priority]||0)+(RANK[t.urgency]||0); }
+    var best=Math.max.apply(null,pool.map(score));
+    var top=pool.filter(function(t){ return score(t)===best; });
     return top[Math.floor(Math.random()*top.length)];
   }
 
@@ -386,8 +379,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var o=openTasks();
     if(!o.length){ return '<h1 class="h1">Nothing left</h1>'; }
     var m=matching();
-    var pc=o.filter(function(t){return ctxOf(t)==="personal";}).length;
-    var wc=o.filter(function(t){return ctxOf(t)==="work";}).length;
+    var pc=o.filter(function(t){return t.context==="personal";}).length;
+    var wc=o.filter(function(t){return t.context==="work";}).length;
     var secs=[["deal","Dealer&#39;s choice","surprise me"],
               ["pick","Choose specific task","choose it myself"],
               ["feel","Choose criteria","match my capacity"]];
@@ -481,7 +474,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   function focusView(t){
     var h='<div class="stage"><div class="stagein">'
       +'<div class="ftop"><button class="hbtn" data-act="hist-back">&larr; all tasks</button>'
-      +'<span class="fmeta">'+esc(t.priority||"med")+' priority &middot; '+esc(tof(t))+'</span></div>'
+      +'<span class="fmeta">'+esc(t.priority||"—")+' priority &middot; '+esc(t.time||"—")+'</span></div>'
       +'<div class="fmid">'
       +'<h1 class="ftitle">'+esc(t.text)+'</h1>'
       +'<div class="timerbox">'
@@ -750,9 +743,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     else if(a==="add"){
       if(!canAdd() || !sb || !user) return;
       var v=(draft.text||"").replace(/^\s+|\s+$/g,"");
-      var row={text:v,priority:draft.p||"med",urgency:draft.u||"med",
-               energy:draft.e||"med",time:draft.t||"med",context:draft.c||"work",
-               horizon:draft.w||"now",done:false,user_id:user.id};
+      var row={text:v,priority:draft.p||null,urgency:draft.u||null,
+               energy:draft.e||null,time:draft.t||null,context:draft.c||null,
+               horizon:draft.w||null,done:false,user_id:user.id};
       el.setAttribute("disabled","");
       sb.from("tasks").insert(row).select().single().then(function(res){
         if(res.error && /horizon/i.test(res.error.message||"")){
@@ -810,7 +803,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     }
     else if(a==="deal-ctx"){
       var ctx=el.getAttribute("data-ctx");
-      var pool=openTasks().filter(function(t){ return ctxOf(t)===ctx; });
+      var pool=openTasks().filter(function(t){ return t.context===ctx; });
       var td=pickOne(pool,null);
       if(!td) return;
       method="deal"; resetTimer(); setScreen("focus", td.id);
