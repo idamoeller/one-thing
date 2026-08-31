@@ -486,7 +486,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       +'</svg>'
       +'<div class="face" data-act="toggle" role="button" tabindex="0" aria-label="'+(timer.run?"Pause timer":"Start timer")+'">'
       +'<button class="settime" data-act="settime">Set time</button>'
-      +'<button class="digits" id="clock" data-act="settime">'+clockText()+'</button>'
+      +'<button class="digits" id="clock" data-act="toggle" aria-label="'+(timer.run?"Pause timer":"Start timer")+'">'+clockText()+'</button>'
       +'<span class="facehint">'+(timer.run?"Tap to pause":"Tap to start")+'</span>'
       +'</div>';
     if(timer.editing){
