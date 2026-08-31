@@ -618,6 +618,23 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     }
     try{ if(navigator.vibrate) navigator.vibrate([180,90,180,90,180]); }catch(e){}
   }
+  function completeChime(){
+    // A short, bright rising bell for completing a task.
+    var ac=getAudio(); if(!ac) return;
+    try{
+      var t0=ac.currentTime, freqs=[659.25,783.99,1046.50]; // E5, G5, C6
+      for(var i=0;i<freqs.length;i++){
+        var o=ac.createOscillator(), g=ac.createGain();
+        o.type="triangle"; o.frequency.value=freqs[i];
+        o.connect(g); g.connect(ac.destination);
+        var s=t0+i*0.09;
+        g.gain.setValueAtTime(0.0001,s);
+        g.gain.exponentialRampToValueAtTime(0.22,s+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,s+0.45);
+        o.start(s); o.stop(s+0.5);
+      }
+    }catch(e){}
+  }
 
   function commitTime(){
     var i=document.getElementById("tmin");
@@ -871,6 +888,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       var did=activeId;
       if(!sb) return;
       stopTimer();
+      completeChime();
       confettiBurst();
       var whenISO=new Date().toISOString();
       sb.from("tasks").update({done:true,done_at:whenISO}).eq("id",did).then(function(res){
