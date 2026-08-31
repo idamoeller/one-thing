@@ -775,7 +775,13 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         draft=freshDraft();
         flash="Added to the pile."; render();
         var nd=document.getElementById("dump"); if(nd) nd.focus();
-        setTimeout(function(){ if(flash==="Added to the pile."){ flash=""; if(screen==="collect") render(); } },1800);
+        // Clear the flash by removing just its node, so focus/caret stay in the textarea.
+        setTimeout(function(){
+          if(flash!=="Added to the pile.") return;
+          flash="";
+          var fl=document.querySelector(".flash");
+          if(fl && fl.parentNode) fl.parentNode.removeChild(fl);
+        },1800);
       });
     }
     else if(a==="del"){
