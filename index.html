@@ -117,6 +117,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .setblock{margin-top:16px;}
 .setlabel{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
 .setgrid{display:grid;gap:6px;}
+.sgrid{display:flex;flex-wrap:wrap;gap:6px;}
+.sgrid .chip{flex:1 1 60px;}
 
 /* menu */
 .menuwrap{position:fixed;inset:0;z-index:9998;}
@@ -198,6 +200,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var draft=freshDraft();
   var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[]};
   var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:""};
+  var timerSound="bell";
 
   function esc(s){
     return String(s).replace(/[&<>"']/g,function(c){
@@ -273,12 +276,13 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       var d = JSON.parse(raw);
       var m = parseInt(d && d.mins,10);
       if(!isNaN(m) && m>0 && m<=600){ timer.mins=m; timer.left=m*60; }
+      if(d && knownSound(d.sound)) timerSound=d.sound;
     }catch(e){}
   }
   function saveMins(){
     try{
       if(window.localStorage){
-        localStorage.setItem(KEY, JSON.stringify({mins:timer.mins}));
+        localStorage.setItem(KEY, JSON.stringify({mins:timer.mins,sound:timerSound}));
       }
     }catch(e){}
   }
@@ -458,6 +462,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       }
       h+='</div></div>';
     }
+    h+='<div class="setblock"><span class="setlabel">Timer sound</span><div class="sgrid">';
+    for(var si=0;si<SOUNDS.length;si++){
+      h+='<button class="chip'+(timerSound===SOUNDS[si][0]?" on":"")+'" data-act="set-sound" data-sound="'+SOUNDS[si][0]+'">'+SOUNDS[si][1]+'</button>';
+    }
+    h+='</div></div>';
     return h;
   }
 
@@ -581,7 +590,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var arc=document.getElementById("arc");
     if(arc) arc.setAttribute("stroke-dasharray", arcDash());
     if(timer.left===0){
-      stopTimer(); chime();
+      stopTimer(); timerAlarm();
       timer.left=timer.mins*60;            // reset so a tap restarts
       flash="Time. Stretch, then decide.";
       render();
@@ -599,23 +608,27 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       return audioCtx;
     }catch(e){ return null; }
   }
-  function chime(){
-    var ac=getAudio();
-    if(ac){
-      try{
-        var t0=ac.currentTime, pat=[0,0.34,0.68,1.02];
-        for(var i=0;i<pat.length;i++){
-          var o=ac.createOscillator(), g=ac.createGain();
-          o.type="sine"; o.frequency.value=(i%2)?660:880;
-          o.connect(g); g.connect(ac.destination);
-          var s=t0+pat[i];
-          g.gain.setValueAtTime(0.0001,s);
-          g.gain.exponentialRampToValueAtTime(0.25,s+0.02);
-          g.gain.exponentialRampToValueAtTime(0.0001,s+0.32);
-          o.start(s); o.stop(s+0.36);
-        }
-      }catch(e){}
-    }
+  function beep(ac,freq,start,dur,vol,type){
+    var o=ac.createOscillator(), g=ac.createGain();
+    o.type=type||"sine"; o.frequency.value=freq;
+    o.connect(g); g.connect(ac.destination);
+    g.gain.setValueAtTime(0.0001,start);
+    g.gain.exponentialRampToValueAtTime(vol||0.22,start+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+    o.start(start); o.stop(start+dur+0.05);
+  }
+  var SOUNDS=[
+    ["bell","Bell",function(ac,t){ beep(ac,1318.51,t,0.5,0.28,"triangle"); beep(ac,1975.53,t,0.3,0.08,"sine"); }],
+    ["chime","Chime",function(ac,t){ var p=[0,0.34,0.68,1.02]; for(var i=0;i<p.length;i++) beep(ac,(i%2)?660:880,t+p[i],0.32,0.22,"sine"); }],
+    ["rising","Rising",function(ac,t){ var f=[659.25,783.99,1046.50]; for(var i=0;i<f.length;i++) beep(ac,f[i],t+i*0.09,0.42,0.20,"triangle"); }],
+    ["ding","Ding",function(ac,t){ beep(ac,880,t,0.6,0.22,"sine"); }],
+    ["none","None",null]
+  ];
+  function soundFn(key){ for(var i=0;i<SOUNDS.length;i++){ if(SOUNDS[i][0]===key) return SOUNDS[i][2]; } return SOUNDS[0][2]; }
+  function knownSound(key){ for(var i=0;i<SOUNDS.length;i++){ if(SOUNDS[i][0]===key) return true; } return false; }
+  function playSound(key){ var fn=soundFn(key); if(!fn) return; var ac=getAudio(); if(!ac) return; try{ fn(ac,ac.currentTime); }catch(e){} }
+  function timerAlarm(){
+    playSound(timerSound);
     try{ if(navigator.vibrate) navigator.vibrate([180,90,180,90,180]); }catch(e){}
   }
   function completeChime(){
@@ -848,6 +861,12 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       defaults[ddim]=el.getAttribute("data-val");
       if(!draft.text.replace(/\s/g,"")) draft=freshDraft();
       saveSettings();
+      render();
+    }
+    else if(a==="set-sound"){
+      timerSound=el.getAttribute("data-sound");
+      saveMins();
+      playSound(timerSound);   // preview
       render();
     }
     else if(a==="sec"){
