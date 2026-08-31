@@ -586,24 +586,35 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       setTimeout(function(){ if(flash==="Time. Stretch, then decide."){ flash=""; if(screen==="focus") render(); } },2600);
     }
   }
-  function chime(){
+  var audioCtx=null;
+  function getAudio(){
+    // Lazily create one shared AudioContext and resume it (must run in a user
+    // gesture, e.g. tapping Start, to unlock audio on iOS/Safari).
     try{
-      var Ctx=window.AudioContext||window.webkitAudioContext;
-      if(!Ctx) return;
-      var ac=new Ctx();
-      var notes=[0,0.28];
-      for(var i=0;i<notes.length;i++){
-        (function(dd,idx){
+      var C=window.AudioContext||window.webkitAudioContext; if(!C) return null;
+      if(!audioCtx) audioCtx=new C();
+      if(audioCtx.state==="suspended" && audioCtx.resume) audioCtx.resume();
+      return audioCtx;
+    }catch(e){ return null; }
+  }
+  function chime(){
+    var ac=getAudio();
+    if(ac){
+      try{
+        var t0=ac.currentTime, pat=[0,0.34,0.68,1.02];
+        for(var i=0;i<pat.length;i++){
           var o=ac.createOscillator(), g=ac.createGain();
-          o.frequency.value=idx?660:880;
+          o.type="sine"; o.frequency.value=(i%2)?660:880;
           o.connect(g); g.connect(ac.destination);
-          g.gain.setValueAtTime(0.0001,ac.currentTime+dd);
-          g.gain.exponentialRampToValueAtTime(0.15,ac.currentTime+dd+0.02);
-          g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+dd+0.5);
-          o.start(ac.currentTime+dd); o.stop(ac.currentTime+dd+0.55);
-        })(notes[i],i);
-      }
-    }catch(e){}
+          var s=t0+pat[i];
+          g.gain.setValueAtTime(0.0001,s);
+          g.gain.exponentialRampToValueAtTime(0.25,s+0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001,s+0.32);
+          o.start(s); o.stop(s+0.36);
+        }
+      }catch(e){}
+    }
+    try{ if(navigator.vibrate) navigator.vibrate([180,90,180,90,180]); }catch(e){}
   }
 
   function commitTime(){
@@ -820,7 +831,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     else if(a==="toggle"){
       if(timer.editing) return;
       if(timer.run){ stopTimer(); }
-      else { flash=""; timer.run=true; timer.iv=setInterval(tick,1000); }
+      else { flash=""; getAudio(); timer.run=true; timer.iv=setInterval(tick,1000); }
       render();
     }
     else if(a==="settime"){
