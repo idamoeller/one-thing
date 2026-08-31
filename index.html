@@ -83,6 +83,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 /* list rows + pills */
 .list{margin-top:8px;}
 .row{display:flex;align-items:flex-start;gap:12px;padding:16px 0;border-bottom:1px solid var(--hairline);}
+.row[data-act]{cursor:pointer;}
 .rowtxt{flex:1;min-width:0;}
 .rowtitle{font-size:13.5px;font-weight:500;letter-spacing:.02em;text-transform:uppercase;line-height:1.35;color:var(--ink);}
 .rowtitle.mid{color:var(--ink-mid);}
@@ -368,7 +369,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     h+='<div class="list">';
     for(var i=0;i<o.length;i++){
       var t=o[i];
-      h+='<div class="row"><div class="rowtxt"><div class="rowtitle">'+esc(t.text)+'</div>'+metricPills(t,false)+'</div>'
+      h+='<div class="row" data-act="pick" data-id="'+t.id+'" role="button" tabindex="0">'
+        +'<div class="rowtxt"><div class="rowtitle">'+esc(t.text)+'</div>'+metricPills(t,false)+'</div>'
         +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
     }
     h+='</div>';
@@ -762,7 +764,17 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       var row={text:v,priority:draft.p||null,urgency:draft.u||null,
                energy:draft.e||null,time:draft.t||null,context:draft.c||null,
                horizon:draft.w||null,done:false,user_id:user.id};
-      el.setAttribute("disabled","");
+      // Optimistic: clear + refocus instantly so the next task can be typed
+      // immediately; the save happens in the background.
+      draft=freshDraft();
+      flash="Added to the pile."; render();
+      var nd=document.getElementById("dump"); if(nd) nd.focus();
+      setTimeout(function(){
+        if(flash!=="Added to the pile.") return;
+        flash="";
+        var fl=document.querySelector(".flash");
+        if(fl && fl.parentNode) fl.parentNode.removeChild(fl);
+      },900);
       sb.from("tasks").insert(row).select().single().then(function(res){
         if(res.error && /horizon/i.test(res.error.message||"")){
           var r2={}; for(var k in row){ if(k!=="horizon") r2[k]=row[k]; }
@@ -770,18 +782,21 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         }
         return res;
       }).then(function(res){
-        if(res && res.error){ flash="Couldn't save: "+res.error.message; render(); return; }
+        if(res && res.error){
+          flash="Couldn't save: "+res.error.message;
+          if(!draft.text.replace(/\s/g,"")) draft.text=v;   // restore lost text if box is empty
+          render();
+          var ne=document.getElementById("dump"); if(ne) ne.focus();
+          return;
+        }
         tasks.unshift(normalize(res.data));
-        draft=freshDraft();
-        flash="Added to the pile."; render();
-        var nd=document.getElementById("dump"); if(nd) nd.focus();
-        // Clear the flash by removing just its node, so focus/caret stay in the textarea.
-        setTimeout(function(){
-          if(flash!=="Added to the pile.") return;
-          flash="";
-          var fl=document.querySelector(".flash");
-          if(fl && fl.parentNode) fl.parentNode.removeChild(fl);
-        },1800);
+        // Enable the pile buttons without a full render (keeps textarea focus).
+        if(screen==="collect"){
+          var b1=document.querySelector('[data-act="go-pile"]');
+          var b2=document.querySelector('[data-act="go-choose"]');
+          if(b1) b1.removeAttribute("disabled");
+          if(b2) b2.removeAttribute("disabled");
+        } else { render(); }
       });
     }
     else if(a==="del"){
