@@ -675,6 +675,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       if(timer.editing){ timer.editing=false; render(); return; }
       if(menuOpen){ menuOpen=false; render(); return; }
     }
+    // Cmd/Ctrl+Enter adds the task on the Collect screen
+    if((ev.metaKey||ev.ctrlKey) && ev.key==="Enter"){
+      var addb=document.querySelector('[data-act="add"]');
+      if(addb && !addb.disabled){ ev.preventDefault(); addb.click(); return; }
+    }
     if(ev.target && ev.target.id==="tmin" && ev.key==="Enter"){ ev.preventDefault(); commitTime(); return; }
     // Enter/Space activate focusable role=button elements (timer face, pick rows)
     if(ev.key==="Enter" || ev.key===" " || ev.key==="Spacebar"){
