@@ -120,6 +120,36 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .sgrid{display:flex;flex-wrap:wrap;gap:6px;}
 .sgrid .chip{flex:1 1 60px;}
 
+/* tags */
+.tagbox{position:relative;margin:4px 0 2px;}
+.tagchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.tagchip{display:inline-flex;align-items:center;gap:6px;background:var(--ink);color:var(--white);border-radius:2px;
+  padding:6px 8px 6px 10px;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;}
+.tagchip .tagx{color:var(--white);opacity:.7;font-size:13px;line-height:1;padding:0 2px;}
+.tagin{width:100%;background:transparent;border:none;border-bottom:1px dashed var(--chip-border);
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);padding:8px 0 9px;}
+.tagin:focus{outline:none;border-bottom-color:var(--ink);}
+.tagin::placeholder{color:var(--muted);text-transform:uppercase;}
+.tagdrop{position:absolute;left:0;right:0;top:100%;background:var(--white);border:1px solid var(--border);border-radius:2px;
+  box-shadow:0 10px 26px rgba(16,19,20,.12);z-index:20;}
+.tagdrop:empty{display:none;}
+.tagopt{display:block;width:100%;text-align:left;padding:11px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink);border-bottom:1px solid var(--hairline);}
+.tagopt:last-child{border-bottom:none;}
+.tagopt.add{color:var(--ink-mid);}
+.rowtags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.tagpill{font-family:var(--mono);font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mid);
+  border:1px solid var(--chip-border);border-radius:2px;padding:3px 6px;background:var(--white);}
+.taglist{display:flex;flex-direction:column;}
+.tagrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--hairline);}
+.tagname{flex:1;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);}
+.tsmall{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:4px 0;}
+.tagren{flex:1;min-width:0;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);
+  background:var(--white);border:1px solid var(--chip-border);border-radius:2px;padding:6px 8px;}
+.tagaddrow{display:flex;gap:8px;align-items:flex-end;margin-top:10px;}
+.tagaddrow .tagin{flex:1;}
+.btn.ghost.tagaddbtn{width:auto;padding:11px 16px;flex:none;}
+
 /* menu */
 .menuwrap{position:fixed;inset:0;z-index:9998;}
 .menuback{position:absolute;inset:0;background:rgba(16,19,20,.18);}
@@ -196,8 +226,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var menuOpen=false;
   var editPill=null;
   var defaults={p:"",u:"",e:"",t:"",c:"",w:""};
-  function freshDraft(){ return {text:"",p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w}; }
+  function freshDraft(){ return {text:"",p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w,tags:[]}; }
   var draft=freshDraft();
+  // Tags (projects): the user's vocabulary lives in settings; each task carries a tags[] array.
+  var tagVocab=[], tagQuery="", tagEdit=null, tagEditBuf="", tagNewBuf="";
   var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[]};
   var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:""};
   var timerSound="bell";
@@ -221,6 +253,79 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var DIMFIELD={p:"priority",u:"urgency",e:"energy",t:"time",c:"context",w:"horizon"};
   function findTask(id){ for(var i=0;i<tasks.length;i++){ if(String(tasks[i].id)===String(id)) return tasks[i]; } return null; }
   function dimDefaultVal(field){ return field==="time"?"med":field==="context"?"work":field==="horizon"?"now":""; }
+
+  // ---- tags ----
+  function normTag(s){ return String(s||"").replace(/\s+/g," ").replace(/^\s+|\s+$/g,""); }
+  function tagEq(a,b){ return normTag(a).toLowerCase()===normTag(b).toLowerCase(); }
+  function hasTag(list,name){ for(var i=0;i<list.length;i++){ if(tagEq(list[i],name)) return true; } return false; }
+  function tagExact(q){ for(var i=0;i<tagVocab.length;i++){ if(tagEq(tagVocab[i],q)) return tagVocab[i]; } return null; }
+  function tagMatches(q){
+    var ql=normTag(q).toLowerCase(); if(!ql) return [];
+    return tagVocab.filter(function(t){ return t.toLowerCase().indexOf(ql)===0 && !hasTag(draft.tags,t); });
+  }
+  function sortVocab(){ tagVocab.sort(function(a,b){ return a.toLowerCase()<b.toLowerCase()?-1:(a.toLowerCase()>b.toLowerCase()?1:0); }); }
+  function createTag(name){ name=normTag(name); if(!name || tagExact(name)) return; tagVocab.push(name); sortVocab(); saveSettings(); }
+  function tagDropHTML(){
+    var q=normTag(tagQuery); if(!q) return "";
+    var m=tagMatches(q), exact=tagExact(q), h="";
+    for(var i=0;i<m.length;i++){ h+='<button class="tagopt" data-act="tag-pick" data-tag="'+esc(m[i])+'">'+esc(m[i])+'</button>'; }
+    if(!exact) h+='<button class="tagopt add" data-act="tag-add" data-tag="'+esc(q)+'">+ Add &ldquo;'+esc(q)+'&rdquo;</button>';
+    return h;
+  }
+  function tagBoxHTML(){
+    var h='<div class="tagbox" id="tagbox">';
+    if(draft.tags.length){
+      h+='<div class="tagchips">';
+      for(var i=0;i<draft.tags.length;i++){
+        h+='<span class="tagchip">'+esc(draft.tags[i])+'<button class="tagx" data-act="tag-remove" data-tag="'+esc(draft.tags[i])+'" aria-label="Remove tag">&times;</button></span>';
+      }
+      h+='</div>';
+    }
+    h+='<input class="tagin" id="tagin" type="text" placeholder="Tag a project…" value="'+esc(tagQuery)+'" autocomplete="off" aria-label="Tag">'
+      +'<div class="tagdrop" id="tagdrop">'+tagDropHTML()+'</div></div>';
+    return h;
+  }
+  function refreshTagBox(){
+    var b=document.getElementById("tagbox"); if(b) b.outerHTML=tagBoxHTML();
+    var i=document.getElementById("tagin"); if(i){ try{ i.focus(); }catch(e){} }
+  }
+  function addDraftTag(name){ if(!hasTag(draft.tags,name)) draft.tags.push(name); tagQuery=""; refreshTagBox(); }
+  function tagCommit(){
+    var q=normTag(tagQuery); if(!q) return;
+    var exact=tagExact(q); if(exact){ addDraftTag(exact); return; }
+    var m=tagMatches(q); if(m.length){ addDraftTag(m[0]); return; }
+    createTag(q); addDraftTag(q);
+  }
+  function tagsHTML(t){
+    var tg=t.tags; if(!tg || !tg.length) return "";
+    var h='<div class="rowtags">';
+    for(var i=0;i<tg.length;i++){ h+='<span class="tagpill">'+esc(tg[i])+'</span>'; }
+    return h+'</div>';
+  }
+  // Rename (newName) or remove (newName=null) a tag across every task, locally and in Supabase.
+  function retagTasks(oldName,newName){
+    for(var i=0;i<tasks.length;i++){
+      var t=tasks[i]; if(!t.tags || !hasTag(t.tags,oldName)) continue;
+      var nt=t.tags.filter(function(x){ return !tagEq(x,oldName); });
+      if(newName && !hasTag(nt,newName)) nt.push(newName);
+      t.tags=nt;
+      if(sb) sb.from("tasks").update({tags:nt}).eq("id",t.id).then(function(res){
+        if(res.error){ flash="Couldn't update tags: "+res.error.message; render(); }
+      });
+    }
+  }
+  // Insert a task, dropping optional columns the table doesn't have yet (horizon, tags).
+  var OPTIONAL_COLS=["horizon","tags"];
+  function insertTask(row){
+    return sb.from("tasks").insert(row).select().single().then(function(res){
+      if(!res.error) return res;
+      var msg=res.error.message||"", drop=null;
+      for(var i=0;i<OPTIONAL_COLS.length;i++){ var c=OPTIONAL_COLS[i]; if((c in row) && msg.indexOf(c)>-1){ drop=c; break; } }
+      if(!drop) return res;
+      var r2={}; for(var k in row){ if(k!==drop) r2[k]=row[k]; }
+      return insertTask(r2);
+    });
+  }
 
   function metricPills(t, ro){
     var h='<div class="pills">';
@@ -255,13 +360,17 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         var base={p:"",u:"",e:"",t:"",c:"",w:""};
         for(var k in d){ if(base.hasOwnProperty(k)) base[k]=d[k]; }
         defaults=base;
+        if(Array.isArray(d.tags)){
+          tagVocab=d.tags.filter(function(x){ return typeof x==="string" && normTag(x); }).map(normTag);
+          sortVocab();
+        }
       }
     }).catch(function(){});
   }
   function saveSettings(){
     if(!sb || !user) return;
     var payload={user_id:user.id,
-      defaults:{p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w},
+      defaults:{p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w,tags:tagVocab},
       updated_at:new Date().toISOString()};
     sb.from("settings").upsert(payload).then(function(res){
       if(res.error){ flash="Couldn't save settings: "+errmsg(res.error); render(); }
@@ -286,7 +395,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       }
     }catch(e){}
   }
-  function normalize(t){ if(!t.doneAt && t.done_at) t.doneAt=t.done_at; return t; }
+  function normalize(t){ if(!t.doneAt && t.done_at) t.doneAt=t.done_at; if(!Array.isArray(t.tags)) t.tags=[]; return t; }
   function loadTasks(){
     if(!sb) return Promise.reject(new Error("Supabase client failed to load (check your connection)."));
     return sb.from("tasks").select("*").order("created_at",{ascending:false})
@@ -304,14 +413,12 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           && inF(filters.context,t.context) && inF(filters.when,t.horizon);
     });
   }
+  // Uniformly random pick from the pool (no priority weighting).
   function pickOne(list,skip){
-    var pool=list.filter(function(t){ return t.id!==skip; });
+    var pool=list.filter(function(t){ return skip==null || String(t.id)!==String(skip); });
     if(!pool.length) pool=list;
     if(!pool.length) return null;
-    function score(t){ return (RANK[t.priority]||0)+(RANK[t.urgency]||0); }
-    var best=Math.max.apply(null,pool.map(score));
-    var top=pool.filter(function(t){ return score(t)===best; });
-    return top[Math.floor(Math.random()*top.length)];
+    return pool[Math.floor(Math.random()*pool.length)];
   }
 
   function chips(label,dim,val,multi,scale){
@@ -348,6 +455,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var o=openTasks();
     var h='<h1 class="h1">Get it out of your head</h1>'
       +'<textarea class="dump" id="dump" placeholder="What is on your mind?" aria-label="New thought">'+esc(draft.text)+'</textarea>'
+      +tagBoxHTML()
       +chips("Priority","p",draft.p,false,LEVELS)
       +chips("Urgency","u",draft.u,false,LEVELS)
       +chips("Energy","e",draft.e,false,LEVELS)
@@ -374,7 +482,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     for(var i=0;i<o.length;i++){
       var t=o[i];
       h+='<div class="row" data-act="pick" data-id="'+t.id+'" role="button" tabindex="0">'
-        +'<div class="rowtxt"><div class="rowtitle">'+esc(t.text)+'</div>'+metricPills(t,false)+'</div>'
+        +'<div class="rowtxt"><div class="rowtitle">'+esc(t.text)+'</div>'+tagsHTML(t)+metricPills(t,false)+'</div>'
         +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
     }
     h+='</div>';
@@ -407,7 +515,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           h+='<div class="scroll">';
           for(var j=0;j<o.length;j++){
             h+='<div class="pickrow" data-act="pick" data-id="'+o[j].id+'" role="button" tabindex="0">'
-              +'<div class="rowtxt"><div class="rowtitle">'+esc(o[j].text)+'</div>'+metricPills(o[j],true)+'</div>'
+              +'<div class="rowtxt"><div class="rowtitle">'+esc(o[j].text)+'</div>'+tagsHTML(o[j])+metricPills(o[j],true)+'</div>'
               +'<button class="rowx" data-act="del" data-id="'+o[j].id+'" aria-label="Remove">&times;</button></div>';
           }
           h+='</div>';
@@ -442,7 +550,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     h+='<div class="list">';
     for(var i=0;i<done.length;i++){
       var t=done[i];
-      h+='<div class="row"><div class="rowtxt"><div class="rowtitle mid">'+esc(t.text)+'</div>'+metricPills(t,true)+'</div></div>';
+      h+='<div class="row"><div class="rowtxt"><div class="rowtitle mid">'+esc(t.text)+'</div>'+tagsHTML(t)+metricPills(t,true)+'</div></div>';
     }
     h+='</div>';
     return h;
@@ -462,6 +570,24 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       }
       h+='</div></div>';
     }
+    h+='<div class="setblock"><span class="setlabel">Tags &middot; projects</span>';
+    if(!tagVocab.length) h+='<p class="emptyline" style="margin:0 0 6px">No tags yet. Add one below.</p>';
+    h+='<div class="taglist">';
+    for(var ti=0;ti<tagVocab.length;ti++){
+      var tgn=tagVocab[ti];
+      if(tagEdit===tgn){
+        h+='<div class="tagrow"><input class="tagren" id="tagren" type="text" value="'+esc(tagEditBuf)+'" aria-label="Rename tag">'
+          +'<button class="tsmall" data-act="tag-rename-save">Save</button>'
+          +'<button class="tsmall" data-act="tag-rename-cancel">Cancel</button></div>';
+      } else {
+        h+='<div class="tagrow"><span class="tagname">'+esc(tgn)+'</span>'
+          +'<button class="tsmall" data-act="tag-edit" data-tag="'+esc(tgn)+'">Rename</button>'
+          +'<button class="rowx" data-act="tag-del" data-tag="'+esc(tgn)+'" aria-label="Delete tag">&times;</button></div>';
+      }
+    }
+    h+='</div><div class="tagaddrow">'
+      +'<input class="tagin" id="tagnew" type="text" placeholder="New tag…" value="'+esc(tagNewBuf)+'" autocomplete="off" aria-label="New tag">'
+      +'<button class="btn ghost tagaddbtn" data-act="tag-create">Add</button></div></div>';
     h+='<div class="setblock"><span class="setlabel">Timer sound</span><div class="sgrid">';
     for(var si=0;si<SOUNDS.length;si++){
       h+='<button class="chip'+(timerSound===SOUNDS[si][0]?" on":"")+'" data-act="set-sound" data-sound="'+SOUNDS[si][0]+'">'+SOUNDS[si][1]+'</button>';
@@ -699,10 +825,44 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       authEmail=ev.target.value;
     } else if(ev.target.id==="pass"){
       authPass=ev.target.value;
+    } else if(ev.target.id==="tagin"){
+      tagQuery=ev.target.value;
+      var dd=document.getElementById("tagdrop"); if(dd) dd.innerHTML=tagDropHTML();
+    } else if(ev.target.id==="tagnew"){
+      tagNewBuf=ev.target.value;
+    } else if(ev.target.id==="tagren"){
+      tagEditBuf=ev.target.value;
     }
   });
 
+  function tagCreateFromSettings(){
+    var i=document.getElementById("tagnew"); if(i) tagNewBuf=i.value;
+    var n=normTag(tagNewBuf); if(!n) return;
+    createTag(n); tagNewBuf=""; render();
+    var j=document.getElementById("tagnew"); if(j){ try{ j.focus(); }catch(e){} }
+  }
+  function tagRenameSave(){
+    var i=document.getElementById("tagren"); if(i) tagEditBuf=i.value;
+    var nn=normTag(tagEditBuf), old=tagEdit, ex=tagExact(nn);
+    if(nn && old && nn!==old && (!ex || tagEq(ex,old))){
+      for(var k=0;k<tagVocab.length;k++){ if(tagEq(tagVocab[k],old)) tagVocab[k]=nn; }
+      sortVocab(); retagTasks(old,nn); saveSettings();
+    }
+    tagEdit=null; render();
+  }
+
   document.addEventListener("keydown",function(ev){
+    var tg=ev.target;
+    if(tg && tg.id==="tagin"){
+      if(ev.key==="Enter" && !ev.metaKey && !ev.ctrlKey){ ev.preventDefault(); tagQuery=tg.value; tagCommit(); return; }
+      if(ev.key==="Escape"){ ev.preventDefault(); tagQuery=""; tg.value=""; var dd=document.getElementById("tagdrop"); if(dd) dd.innerHTML=""; return; }
+      if(ev.key==="Backspace" && !tg.value && draft.tags.length){ ev.preventDefault(); draft.tags.pop(); refreshTagBox(); return; }
+    }
+    if(tg && tg.id==="tagnew" && ev.key==="Enter"){ ev.preventDefault(); tagCreateFromSettings(); return; }
+    if(tg && tg.id==="tagren"){
+      if(ev.key==="Enter"){ ev.preventDefault(); tagRenameSave(); return; }
+      if(ev.key==="Escape"){ ev.preventDefault(); tagEdit=null; render(); return; }
+    }
     if(ev.key==="Escape"){
       if(timer.editing){ timer.editing=false; render(); return; }
       if(menuOpen){ menuOpen=false; render(); return; }
@@ -793,10 +953,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       var v=(draft.text||"").replace(/^\s+|\s+$/g,"");
       var row={text:v,priority:draft.p||null,urgency:draft.u||null,
                energy:draft.e||null,time:draft.t||null,context:draft.c||null,
-               horizon:draft.w||null,done:false,user_id:user.id};
+               horizon:draft.w||null,tags:draft.tags.slice(),done:false,user_id:user.id};
       // Optimistic: clear + refocus instantly so the next task can be typed
       // immediately; the save happens in the background.
-      draft=freshDraft();
+      draft=freshDraft(); tagQuery="";
       flash="Added to the pile."; render();
       var nd=document.getElementById("dump"); if(nd) nd.focus();
       setTimeout(function(){
@@ -805,13 +965,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         var fl=document.querySelector(".flash");
         if(fl && fl.parentNode) fl.parentNode.removeChild(fl);
       },900);
-      sb.from("tasks").insert(row).select().single().then(function(res){
-        if(res.error && /horizon/i.test(res.error.message||"")){
-          var r2={}; for(var k in row){ if(k!=="horizon") r2[k]=row[k]; }
-          return sb.from("tasks").insert(r2).select().single();
-        }
-        return res;
-      }).then(function(res){
+      insertTask(row).then(function(res){
         if(res && res.error){
           flash="Couldn't save: "+res.error.message;
           if(!draft.text.replace(/\s/g,"")) draft.text=v;   // restore lost text if box is empty
@@ -868,6 +1022,28 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       saveMins();
       playSound(timerSound);   // preview
       render();
+    }
+    else if(a==="tag-pick"){ addDraftTag(el.getAttribute("data-tag")); }
+    else if(a==="tag-add"){
+      var tn=normTag(el.getAttribute("data-tag"));
+      if(tn){ createTag(tn); addDraftTag(tagExact(tn)||tn); }
+    }
+    else if(a==="tag-remove"){
+      var rt=el.getAttribute("data-tag");
+      draft.tags=draft.tags.filter(function(x){ return !tagEq(x,rt); });
+      refreshTagBox();
+    }
+    else if(a==="tag-create"){ tagCreateFromSettings(); }
+    else if(a==="tag-edit"){
+      tagEdit=el.getAttribute("data-tag"); tagEditBuf=tagEdit; render();
+      var ri=document.getElementById("tagren"); if(ri){ try{ ri.focus(); ri.select(); }catch(e){} }
+    }
+    else if(a==="tag-rename-save"){ tagRenameSave(); }
+    else if(a==="tag-rename-cancel"){ tagEdit=null; render(); }
+    else if(a==="tag-del"){
+      var dt=el.getAttribute("data-tag");
+      tagVocab=tagVocab.filter(function(x){ return !tagEq(x,dt); });
+      retagTasks(dt,null); saveSettings(); render();
     }
     else if(a==="sec"){
       var sc=el.getAttribute("data-sec");
