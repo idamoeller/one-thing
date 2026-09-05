@@ -66,6 +66,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .dial .clbl{width:62px;flex:none;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);}
 .chips{flex:1;min-width:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
 .chips.two{grid-template-columns:repeat(2,1fr);}
+.chips.wrap{display:flex;flex-wrap:wrap;}
+.chips.wrap .chip{flex:0 1 auto;min-height:36px;padding-left:12px;padding-right:12px;}
+.tagsdial{align-items:flex-start;}
+.tagsdial .clbl{padding-top:12px;}
 .chip{display:flex;align-items:center;justify-content:center;text-align:center;min-height:40px;padding:9px 3px;
   border-radius:2px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
   border:1px solid var(--chip-border);background:var(--white);color:var(--ink-mid);}
@@ -242,7 +246,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   // Tags (projects): the user's vocabulary lives in settings; each task carries a tags[] array.
   var tagVocab=[], tagQuery="", tagEdit=null, tagEditBuf="", tagNewBuf="";
   var rowTagEdit=null, rowTagQuery="", titleEdit=null, titleBuf="";   // inline editing on the pile
-  var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[]};
+  var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[]};
   var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:""};
   var timerSound="bell";
 
@@ -476,11 +480,19 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   }
 
   function inF(vals,v){ return !vals.length || !v || vals.indexOf(v)>-1; }
+  // Tag filter is strict: with tags selected, a task must carry at least one of them.
+  function tagOK(t){
+    if(!filters.tags.length) return true;
+    var tg=t.tags||[];
+    for(var i=0;i<tg.length;i++){ if(hasTag(filters.tags,tg[i])) return true; }
+    return false;
+  }
   function matching(){
     return openTasks().filter(function(t){
       return inF(filters.priority,t.priority) && inF(filters.urgency,t.urgency)
           && inF(filters.energy,t.energy) && inF(filters.time,t.time)
-          && inF(filters.context,t.context) && inF(filters.when,t.horizon);
+          && inF(filters.context,t.context) && inF(filters.when,t.horizon)
+          && tagOK(t);
     });
   }
   // Uniformly random pick from the pool (no priority weighting).
@@ -500,6 +512,16 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'"'
         +' data-act="chip" data-dim="'+dim+'" data-val="'+l+'"'
         +' data-multi="'+(multi?1:0)+'">'+l+'</button>';
+    }
+    return h+'</div></div>';
+  }
+
+  // Multi-select tag chips for the Choose criteria filter.
+  function tagFilterRow(){
+    var h='<div class="dial tagsdial"><span class="clbl">Tags</span><div class="chips wrap">';
+    for(var i=0;i<tagVocab.length;i++){
+      var on=hasTag(filters.tags,tagVocab[i]);
+      h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'" data-act="chip" data-dim="tags" data-val="'+esc(tagVocab[i])+'" data-multi="1">'+esc(tagVocab[i])+'</button>';
     }
     return h+'</div></div>';
   }
@@ -603,6 +625,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
             +chips("Time","time",filters.time,true,TIMES)
             +chips("When","when",filters.when,true,WHENS)
             +chips("Context","context",filters.context,true,CONTEXTS)
+            +(tagVocab.length?tagFilterRow():"")
             +'<button class="btn showone" data-act="show-one"'+(m.length?"":" disabled")+'>'
             +(m.length?("Show me one — "+m.length+" match"):"Nothing matches that")
             +'</button>';
@@ -930,6 +953,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     if(nn && old && nn!==old && (!ex || tagEq(ex,old))){
       for(var k=0;k<tagVocab.length;k++){ if(tagEq(tagVocab[k],old)) tagVocab[k]=nn; }
       sortVocab(); retagTasks(old,nn); saveSettings();
+      filters.tags=filters.tags.map(function(x){ return tagEq(x,old)?nn:x; });
     }
     tagEdit=null; render();
   }
@@ -1134,6 +1158,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     else if(a==="tag-del"){
       var dt=el.getAttribute("data-tag");
       tagVocab=tagVocab.filter(function(x){ return !tagEq(x,dt); });
+      filters.tags=filters.tags.filter(function(x){ return !tagEq(x,dt); });
       retagTasks(dt,null); saveSettings(); render();
     }
     else if(a==="title-edit"){
