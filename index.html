@@ -207,6 +207,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .elsebtn{display:block;width:100%;text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:4px 0;}
 
 #cf{position:fixed;inset:0;pointer-events:none;z-index:10000;}
+.keepbtn{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);border:1px solid var(--ink);border-radius:20px;padding:4px 10px;flex:none;white-space:nowrap;cursor:pointer;background:none;}
+.hinbox{color:var(--ink);font-weight:600;}
 </style>
 </head>
 <body>
@@ -256,7 +258,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     });
   }
   function uid(){ return Math.random().toString(36).slice(2,10); }
-  function openTasks(){ return tasks.filter(function(t){ return !t.done; }); }
+  function openTasks(){ return tasks.filter(function(t){ return !t.done && !t.inbox; }); }
+  function inboxTasks(){ return tasks.filter(function(t){ return !t.done && t.inbox; }); }
   function tof(t){ return t.time || "med"; }
   function ctxOf(t){ return t.context || "work"; }
   function canAdd(){
@@ -469,7 +472,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       }
     }catch(e){}
   }
-  function normalize(t){ if(!t.doneAt && t.done_at) t.doneAt=t.done_at; if(!Array.isArray(t.tags)) t.tags=[]; return t; }
+  function normalize(t){ if(!t.doneAt && t.done_at) t.doneAt=t.done_at; if(!Array.isArray(t.tags)) t.tags=[]; t.inbox=!!t.inbox; return t; }
   function loadTasks(){
     if(!sb) return Promise.reject(new Error("Supabase client failed to load (check your connection)."));
     return sb.from("tasks").select("*").order("created_at",{ascending:false})
@@ -582,6 +585,30 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           : '<div class="rowtitle">'+esc(t.text)+'</div>')
         +rowTagShelf(t)+metricPills(t,false)+'</div>'
         +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
+        +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
+    }
+    h+='</div>';
+    return h;
+  }
+
+  function inboxView(){
+    var o=inboxTasks();
+    var h='<h1 class="h1">Inbox'+(o.length?(" — "+o.length+" new"):"")+'</h1>'
+      +'<p class="setnote">Fresh from your morning brief. Triage here, then move each to your pile.</p>';
+    if(!o.length){ h+='<p class="emptyline">Inbox zero. Nothing waiting.</p>'; return h; }
+    h+='<div class="list">';
+    for(var i=0;i<o.length;i++){
+      var t=o[i];
+      var editingTitle=String(titleEdit)===String(t.id);
+      h+='<div class="row">'
+        +'<div class="rowtxt">'
+        +(editingTitle
+          ? '<div class="titleedit" data-act="noop"><input class="titlein" id="titlein" type="text" value="'+esc(titleBuf)+'" aria-label="Task">'
+            +'<button class="tsmall" data-act="title-save">Save</button><button class="tsmall" data-act="title-cancel">Cancel</button></div>'
+          : '<div class="rowtitle">'+esc(t.text)+'</div>')
+        +rowTagShelf(t)+metricPills(t,false)+'</div>'
+        +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
+        +'<button class="keepbtn" data-act="inbox-keep" data-id="'+t.id+'">Move to pile</button>'
         +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
     }
     h+='</div>';
@@ -764,20 +791,23 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       return x.done && x.doneAt && new Date(x.doneAt).toDateString()===today;
     }).length;
     var notCollect=screen!=="collect";
+    var inboxN=inboxTasks().length;
 
     var h='<div class="shell"><header class="hdr">'
       +(notCollect?'<button class="hbtn hback" data-act="hist-back" aria-label="Back">&larr;</button>':'')
       +(doneToday?('<button class="hbtn htally" data-act="nav" data-to="done">'+doneToday+' done today</button>'):'')
+      +((inboxN && screen!=="inbox")?('<button class="hbtn hinbox" data-act="nav" data-to="inbox">📥 '+inboxN+'</button>'):'')
       +'<span class="hspace"></span>'
       +(notCollect?'<button class="hbtn hnew" data-act="nav" data-to="collect">+ New</button>':'')
       +'<button class="hbtn hmenu" data-act="menu-toggle" aria-expanded="'+menuOpen+'">Menu</button>'
       +'</header><div class="bodywrap">';
     if(flash) h+='<div class="flash">'+esc(flash)+'</div>';
-    h+=(screen==="collect"?collectView():screen==="pile"?pileView():screen==="done"?doneView():screen==="settings"?settingsView():chooseView());
+    h+=(screen==="collect"?collectView():screen==="inbox"?inboxView():screen==="pile"?pileView():screen==="done"?doneView():screen==="settings"?settingsView():chooseView());
     h+='</div></div>';
     if(menuOpen){
       h+='<div class="menuwrap"><div class="menuback" data-act="menu-close"></div><nav class="menu">'
         +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
+        +'<button class="'+(screen==="inbox"?"on":"")+'" data-act="nav" data-to="inbox">Inbox'+(inboxN?(" ("+inboxN+")"):"")+'</button>'
         +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
         +'<button class="'+(screen==="pile"?"on":"")+'" data-act="nav" data-to="pile">All tasks</button>'
         +'<button class="'+(screen==="done"?"on":"")+'" data-act="nav" data-to="done">Completed</button>'
@@ -1106,6 +1136,15 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         tasks=tasks.filter(function(t){ return String(t.id)!==String(id); });
         render();
       });
+    }
+    else if(a==="inbox-keep"){
+      var kid=el.getAttribute("data-id"), kt=findTask(kid);
+      if(kt && sb){
+        kt.inbox=false; render();
+        sb.from("tasks").update({inbox:false}).eq("id",kid).then(function(res){
+          if(res.error){ kt.inbox=true; flash="Couldn't move: "+res.error.message; render(); }
+        });
+      }
     }
     else if(a==="go-choose"){ flash=""; setScreen("choose"); }
     else if(a==="go-pile"){ flash=""; setScreen("pile"); }
