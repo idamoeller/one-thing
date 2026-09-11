@@ -613,6 +613,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       var t=o[i];
       var editingTitle=String(titleEdit)===String(t.id);
       h+='<div class="row">'
+        +'<button class="rowstar'+(t.must?" on":"")+'" data-act="toggle-must-row" data-id="'+t.id+'" aria-pressed="'+(t.must?"true":"false")+'" aria-label="Must do">'+(t.must?"★":"☆")+'</button>'
         +'<div class="rowtxt">'
         +(editingTitle
           ? '<div class="titleedit" data-act="noop"><input class="titlein" id="titlein" type="text" value="'+esc(titleBuf)+'" aria-label="Task">'
