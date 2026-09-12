@@ -217,6 +217,15 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .mustbtn .star{font-size:14px;line-height:1;}
 .rowstar{flex:none;align-self:flex-start;font-size:17px;line-height:1;color:var(--muted);padding:2px 4px;background:none;border:none;cursor:pointer;}
 .rowstar.on{color:var(--ink);}
+
+/* Desktop: same single-column layout, just wider and roomier. Kicks in automatically
+   on wide windows; below 780px (phones) everything above is untouched. */
+@media (min-width:780px){
+  .shell{max-width:720px;}
+  .hdr{padding:0 32px;}
+  .bodywrap{padding:34px 32px 46px;}
+  .stagein{max-width:720px;padding-left:32px;padding-right:32px;}
+}
 </style>
 </head>
 <body>
