@@ -1232,6 +1232,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     try{
       var C=window.AudioContext||window.webkitAudioContext; if(!C) return null;
       if(!audioCtx) audioCtx=new C();
+      // Respect the device mute switch (iOS): declare our sound as incidental
+      // "ambient" audio so it is silenced when the phone is muted, like a UI sound.
+      try{ if(navigator.audioSession) navigator.audioSession.type="ambient"; }catch(e){}
       if(audioCtx.state==="suspended" && audioCtx.resume) audioCtx.resume();
       return audioCtx;
     }catch(e){ return null; }
