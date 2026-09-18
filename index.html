@@ -808,8 +808,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
             +'<button class="tsmall" data-act="title-save">Save</button><button class="tsmall" data-act="title-cancel">Cancel</button></div>'
           : '<div class="rowtitle">'+esc(t.text)+'</div>')
         +rowTagShelf(t)+metricPills(t,false)+'</div>'
-        +'<button class="rowcheck" data-act="complete-row" data-id="'+t.id+'" aria-label="Mark complete">'+CHECK+'</button>'
         +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
+        +'<button class="rowcheck" data-act="complete-row" data-id="'+t.id+'" aria-label="Mark complete">'+CHECK+'</button>'
         +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
     }
     h+='</div>';
