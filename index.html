@@ -154,7 +154,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .tagaddrow .tagin{flex:1;}
 .btn.ghost.tagaddbtn{width:auto;padding:11px 16px;flex:none;}
 /* inline editing on pile rows */
-.rowedit{color:var(--muted);padding:2px 4px;flex:none;display:flex;align-items:center;}
+.rowedit,.rowcheck{color:var(--muted);padding:2px 4px;flex:none;display:flex;align-items:center;}
+.rowcheck:hover{color:var(--ink);}
 .tagpill.edit{display:inline-flex;align-items:center;gap:5px;padding-right:4px;}
 .tagpx{color:var(--muted);font-size:11px;line-height:1;padding:0 2px;}
 .tagplus{font-family:var(--mono);font-size:10px;line-height:1;color:var(--muted);border:1px dashed var(--chip-border);border-radius:2px;padding:3px 7px;}
@@ -425,6 +426,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return h+'</div>';
   }
   var PENCIL='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2L5.5 12.5H3.5v-2z"></path><path d="M10 4l2 2"></path></svg>';
+  var CHECK='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 4.5"></path></svg>';
   // Editable tag shelf for a pile row: pills with ×, a + to add, and the
   // predictive input when this row's tag editor is open.
   function rowTagShelf(t){
@@ -711,6 +713,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
             +'<button class="tsmall" data-act="title-save">Save</button><button class="tsmall" data-act="title-cancel">Cancel</button></div>'
           : '<div class="rowtitle">'+esc(t.text)+'</div>')
         +rowTagShelf(t)+metricPills(t,false)+'</div>'
+        +'<button class="rowcheck" data-act="complete-row" data-id="'+t.id+'" aria-label="Mark complete">'+CHECK+'</button>'
         +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
         +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
     }
@@ -1445,6 +1448,19 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         tasks=tasks.filter(function(t){ return String(t.id)!==String(id); });
         render();
       });
+    }
+    else if(a==="complete-row"){
+      var qid=el.getAttribute("data-id"), qt=findTask(qid);
+      if(!qt || !sb || qt.done) return;
+      qt.done=true; qt.doneAt=Date.now(); flash="Completed."; render();
+      var whenISO=new Date().toISOString();
+      sb.from("tasks").update({done:true,done_at:whenISO}).eq("id",qid).then(function(res){
+        if(res.error && /done_at/i.test(res.error.message||"")) return sb.from("tasks").update({done:true}).eq("id",qid);
+        return res;
+      }).then(function(res){
+        if(res && res.error){ qt.done=false; qt.doneAt=null; flash="Couldn't complete: "+res.error.message; render(); }
+      });
+      setTimeout(function(){ if(flash==="Completed."){ flash=""; render(); } },1400);
     }
     else if(a==="inbox-keep"){
       var kid=el.getAttribute("data-id"), kt=findTask(kid);
