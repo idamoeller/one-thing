@@ -1569,7 +1569,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     else if(a==="complete-row"){
       var qid=el.getAttribute("data-id"), qt=findTask(qid);
       if(!qt || !sb || qt.done) return;
-      qt.done=true; qt.doneAt=Date.now(); flash="Completed."; render();
+      qt.done=true; qt.doneAt=Date.now(); flash="Completed."; completeChime(); render();
       var whenISO=new Date().toISOString();
       sb.from("tasks").update({done:true,done_at:whenISO}).eq("id",qid).then(function(res){
         if(res.error && /done_at/i.test(res.error.message||"")) return sb.from("tasks").update({done:true}).eq("id",qid);
