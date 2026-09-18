@@ -1236,6 +1236,15 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       return audioCtx;
     }catch(e){ return null; }
   }
+  // Run fn(ac) once the shared context is actually running. On the first gesture
+  // the context is created 'suspended' and resuming is async, so scheduling sound
+  // immediately can be silent — wait for resume, then play.
+  function withAudio(fn){
+    var ac=getAudio(); if(!ac) return;
+    var run=function(){ try{ fn(ac); }catch(e){} };
+    if(ac.state==="suspended" && ac.resume){ try{ ac.resume().then(run,run); }catch(e){ run(); } }
+    else run();
+  }
   function beep(ac,freq,start,dur,vol,type){
     var o=ac.createOscillator(), g=ac.createGain();
     o.type=type||"sine"; o.frequency.value=freq;
@@ -1254,15 +1263,14 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   ];
   function soundFn(key){ for(var i=0;i<SOUNDS.length;i++){ if(SOUNDS[i][0]===key) return SOUNDS[i][2]; } return SOUNDS[0][2]; }
   function knownSound(key){ for(var i=0;i<SOUNDS.length;i++){ if(SOUNDS[i][0]===key) return true; } return false; }
-  function playSound(key){ var fn=soundFn(key); if(!fn) return; var ac=getAudio(); if(!ac) return; try{ fn(ac,ac.currentTime); }catch(e){} }
+  function playSound(key){ var fn=soundFn(key); if(!fn) return; withAudio(function(ac){ fn(ac,ac.currentTime); }); }
   function timerAlarm(){
     playSound(timerSound);
     try{ if(navigator.vibrate) navigator.vibrate([180,90,180,90,180]); }catch(e){}
   }
   function completeChime(){
     // A short, bright rising bell for completing a task.
-    var ac=getAudio(); if(!ac) return;
-    try{
+    withAudio(function(ac){
       var t0=ac.currentTime, freqs=[659.25,783.99,1046.50]; // E5, G5, C6
       for(var i=0;i<freqs.length;i++){
         var o=ac.createOscillator(), g=ac.createGain();
@@ -1274,8 +1282,18 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         g.gain.exponentialRampToValueAtTime(0.0001,s+0.45);
         o.start(s); o.stop(s+0.5);
       }
-    }catch(e){}
+    });
   }
+  // Prime Web Audio on the first user interaction so the timer alarm and the
+  // completion chime are unlocked and ready (iOS/Safari need a user gesture).
+  (function(){
+    function prime(){ getAudio();
+      document.removeEventListener("pointerdown",prime,true);
+      document.removeEventListener("touchend",prime,true);
+    }
+    document.addEventListener("pointerdown",prime,true);
+    document.addEventListener("touchend",prime,true);
+  })();
 
   function commitTime(){
     var i=document.getElementById("tmin");
