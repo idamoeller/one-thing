@@ -244,6 +244,17 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .rowtitle.done{color:var(--muted);text-decoration:line-through;}
 .planadd{margin-top:12px;}
 .carry{margin:4px 0 14px;}
+/* pile view filter */
+.pilefilterrow{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;}
+.pilefilterbtn{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);border:1px solid var(--ink);border-radius:2px;padding:9px 14px;background:var(--white);cursor:pointer;}
+.pilefilterbtn.on{background:var(--ink);color:var(--white);}
+.pfshown{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
+.pfpanel{margin-top:14px;padding:16px;border:1px solid var(--border);border-radius:3px;background:var(--white);}
+.pfpanel .dial:first-child{margin-top:0;}
+.pffoot{display:flex;align-items:center;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--hairline);}
+.pfcount{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
+.pfclear{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);border:1px solid var(--ink);border-radius:2px;padding:8px 14px;background:none;cursor:pointer;}
+.pfchoose{margin-top:14px;}
 
 /* Desktop: same single-column layout, just wider and roomier. Kicks in automatically
    on wide windows; below 780px (phones) everything above is untouched. */
@@ -294,6 +305,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var rowTagEdit=null, rowTagQuery="", titleEdit=null, titleBuf="";   // inline editing on the pile
   var focusEdit=false;   // when true, the focus/timer screen shows its inline title + tag editor
   var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[]};
+  // Pile view filter (independent of the Choose "Zero in" filters above). Multi-select
+  // per dimension + tags, plus starred/D3 flags. Purely a view filter; never picks.
+  var pileFilterOpen=false;
+  var pileFilters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[],must:false,d3:false};
   var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:"",endAt:null};
   var timerSound="bell";
   // Plan / Big 3 (Full Focus style). Weekly = free-text outcomes; Daily = linked task ids.
@@ -613,12 +628,13 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   // Dealer's-choice context, or (as a fallback) all open tasks.
   function bucketPool(){
     if(method==="filter") return matching();
+    if(method==="pilefilter") return pileMatching(openTasks());
     if(method==="deal") return openTasks().filter(function(t){ return t.context===dealCtx; });
     return openTasks();
   }
   // Buckets that yield a random "next" task. A specific pick has no bucket, so
   // finishing/skipping one sends you back to the task list to choose again.
-  function bucketIsRandom(){ return method==="filter" || method==="deal"; }
+  function bucketIsRandom(){ return method==="filter" || method==="pilefilter" || method==="deal"; }
   // Go to the Choose screen with the "Specific task" list open, ready to pick.
   function gotoPickList(){ setScreen("choose", null); openSec="pick"; render(); }
   // Swap the focus screen to another task (keeps us on the timer), fresh timer.
@@ -688,15 +704,94 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return h;
   }
 
+  // Multi-select chip row bound to pileFilters (view filter for the pile).
+  function pileChips(label,dim,opts){
+    var val=pileFilters[dim];
+    var h='<div class="dial"><span class="clbl">'+label+'</span><div class="chips'+(opts.length===2?" two":"")+'">';
+    for(var i=0;i<opts.length;i++){
+      var on=val.indexOf(opts[i])>-1;
+      h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'" data-act="pchip" data-dim="'+dim+'" data-val="'+esc(opts[i])+'">'+esc(opts[i])+'</button>';
+    }
+    return h+'</div></div>';
+  }
+  function pileTagRow(){
+    var h='<div class="dial tagsdial"><span class="clbl">Tags</span><div class="chips wrap">';
+    for(var i=0;i<tagVocab.length;i++){
+      var on=hasTag(pileFilters.tags,tagVocab[i]);
+      h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'" data-act="pchip" data-dim="tags" data-val="'+esc(tagVocab[i])+'">'+esc(tagVocab[i])+'</button>';
+    }
+    return h+'</div></div>';
+  }
+  function pileFilterActive(){
+    var f=pileFilters;
+    return !!(f.must||f.d3||f.priority.length||f.urgency.length||f.energy.length||f.time.length||f.context.length||f.when.length||f.tags.length);
+  }
+  function pileFilterCount(){
+    var f=pileFilters, n=0;
+    if(f.must) n++; if(f.d3) n++;
+    return n+f.priority.length+f.urgency.length+f.energy.length+f.time.length+f.context.length+f.when.length+f.tags.length;
+  }
+  // Strict AND across categories: a set dimension must match exactly (a task with
+  // that dimension unset is excluded), tags need at least one overlap, flags require the mark.
+  function pileMatching(list){
+    var f=pileFilters;
+    function ok(vals,v){ return !vals.length || (!!v && vals.indexOf(v)>-1); }
+    return list.filter(function(t){
+      if(f.must && !t.must) return false;
+      if(f.d3 && !inDayBig3(t.id)) return false;
+      if(!ok(f.priority,t.priority)) return false;
+      if(!ok(f.urgency,t.urgency)) return false;
+      if(!ok(f.energy,t.energy)) return false;
+      if(!ok(f.time,t.time)) return false;
+      if(!ok(f.context,t.context)) return false;
+      if(!ok(f.when,t.horizon)) return false;
+      if(f.tags.length){
+        var tg=t.tags||[], has=false;
+        for(var i=0;i<tg.length;i++){ if(hasTag(f.tags,tg[i])){ has=true; break; } }
+        if(!has) return false;
+      }
+      return true;
+    });
+  }
+
   function pileView(){
-    var o=openTasks();
+    var all=openTasks();
     // Must-do tasks float to the top; stable sort keeps the newest-first order within each group.
-    o.sort(function(a,b){ return (b.must?1:0)-(a.must?1:0); });
-    var h='<h1 class="h1">The pile'+(o.length?(" — "+o.length+" "+(o.length===1?"task":"tasks")):"")+'</h1>'
-      +'<button class="btn ghost pilecta" data-act="go-choose"'+(o.length?"":" disabled")+'>Choose task</button>';
-    if(!o.length){
-      h+='<p class="emptyline">Nothing here yet. Add something first.</p>';
+    all.sort(function(a,b){ return (b.must?1:0)-(a.must?1:0); });
+    var total=all.length;
+    var h='<h1 class="h1">The pile'+(total?(" — "+total+" "+(total===1?"task":"tasks")):"")+'</h1>';
+    if(!total){
+      h+='<button class="btn ghost pilecta" data-act="go-choose" disabled>Choose task</button>'
+        +'<p class="emptyline">Nothing here yet. Add something first.</p>';
       return h;
+    }
+    h+='<button class="btn ghost pilecta" data-act="go-choose">Choose task</button>';
+    var active=pileFilterActive();
+    var o=active?pileMatching(all):all;
+    h+='<div class="pilefilterrow"><button class="pilefilterbtn'+(active?" on":"")+'" data-act="pfilter-toggle" aria-expanded="'+pileFilterOpen+'">'
+      +(active?("Filter · "+pileFilterCount()):"Filter")+'</button>'
+      +(active?('<span class="pfshown">'+o.length+' of '+total+' shown</span>'):'')
+      +'</div>';
+    if(pileFilterOpen){
+      h+='<div class="pfpanel">'
+        +'<div class="dial"><span class="clbl">Marks</span><div class="chips two">'
+        +'<button class="chip'+(pileFilters.must?" on":"")+'" aria-pressed="'+pileFilters.must+'" data-act="pflag" data-flag="must">&#9733; Starred</button>'
+        +'<button class="chip'+(pileFilters.d3?" on":"")+'" aria-pressed="'+pileFilters.d3+'" data-act="pflag" data-flag="d3">D3 today</button>'
+        +'</div></div>'
+        +pileChips("Priority","priority",LEVELS)
+        +pileChips("Urgency","urgency",LEVELS)
+        +pileChips("Energy","energy",LEVELS)
+        +pileChips("Time","time",TIMES)
+        +pileChips("Context","context",CONTEXTS)
+        +pileChips("When","when",WHENS)
+        +(tagVocab.length?pileTagRow():"")
+        +'<div class="pffoot">'+(active?'<button class="pfclear" data-act="pfilter-clear">Clear all</button>':'<span class="pfcount">Tap to filter the pile</span>')+'</div>'
+        +'</div>';
+    }
+    if(active && !o.length){
+      h+='<p class="emptyline">No tasks match these filters.</p>';
+    } else if(active){
+      h+='<button class="btn pfchoose" data-act="pfilter-choose">Choose one of these '+o.length+'</button>';
     }
     h+='<div class="list">';
     for(var i=0;i<o.length;i++){
@@ -1404,6 +1499,28 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         draft[dim]=val;
       }
       render();
+    }
+    else if(a==="pchip"){
+      var fdim=el.getAttribute("data-dim"), fval=el.getAttribute("data-val");
+      var farr=pileFilters[fdim], fk=farr.indexOf(fval);
+      if(fk>-1) farr.splice(fk,1); else farr.push(fval);
+      render();
+    }
+    else if(a==="pflag"){
+      var fflag=el.getAttribute("data-flag");
+      pileFilters[fflag]=!pileFilters[fflag];
+      render();
+    }
+    else if(a==="pfilter-toggle"){ pileFilterOpen=!pileFilterOpen; render(); }
+    else if(a==="pfilter-clear"){
+      pileFilters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[],must:false,d3:false};
+      render();
+    }
+    else if(a==="pfilter-choose"){
+      var ppool=pileMatching(openTasks());
+      var pchosen=pickOne(ppool,null);
+      if(!pchosen) return;
+      method="pilefilter"; resetTimer(); setScreen("focus", pchosen.id);
     }
     else if(a==="add"){
       if(!canAdd() || !sb || !user) return;
