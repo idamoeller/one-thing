@@ -185,6 +185,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .fmeta{text-align:right;}
 .fmid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:20px 0;}
 .ftitle{font-size:27px;font-weight:600;line-height:1.18;letter-spacing:.02em;text-transform:uppercase;text-align:center;margin:0;overflow-wrap:break-word;}
+.fhead{display:flex;flex-direction:column;align-items:center;gap:13px;}
+.ftags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
+.ftags .tagpill{font-size:9px;padding:4px 8px;}
 .timerbox{position:relative;width:224px;height:224px;}
 .timerbox svg{position:absolute;inset:0;width:224px;height:224px;}
 .face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;}
@@ -757,12 +760,23 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return ((timer.left/total)*ARC_C).toFixed(2)+" "+ARC_C;
   }
 
+  // Read-only tag pills for the focus/timer screen (shown under the task title).
+  function focusTagsHTML(t){
+    var tg=t.tags; if(!tg || !tg.length) return "";
+    var h='<div class="ftags">';
+    for(var i=0;i<tg.length;i++){ h+='<span class="tagpill">'+esc(tg[i])+'</span>'; }
+    return h+'</div>';
+  }
+
   function focusView(t){
     var h='<div class="stage"><div class="stagein">'
       +'<div class="ftop"><button class="hbtn" data-act="hist-back">&larr; all tasks</button>'
       +'<span class="fmeta">'+esc(t.priority||"—")+' priority &middot; '+esc(t.time||"—")+'</span></div>'
       +'<div class="fmid">'
+      +'<div class="fhead">'
       +'<h1 class="ftitle">'+esc(t.text)+'</h1>'
+      +focusTagsHTML(t)
+      +'</div>'
       +'<div class="timerbox">'
       +'<svg viewBox="0 0 246 246" aria-hidden="true">'
       +'<circle cx="123" cy="123" r="116" fill="none" stroke="#D5D9DB" stroke-width="7" stroke-dasharray="1.6 7.5"></circle>'
