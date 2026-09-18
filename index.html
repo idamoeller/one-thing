@@ -166,7 +166,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .titlein:focus{outline:none;border-color:var(--ink);}
 
 /* menu */
-.menuwrap{position:fixed;inset:0;z-index:9998;}
+.menuwrap{position:fixed;inset:0;z-index:10001;}
 .menuback{position:absolute;inset:0;background:rgba(16,19,20,.18);}
 .menu{position:absolute;top:12px;right:14px;width:240px;background:var(--surface);border:1px solid var(--border);
   border-radius:3px;padding:4px 16px;box-shadow:0 14px 34px rgba(16,19,20,.16);}
@@ -181,8 +181,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .stagein{width:100%;max-width:540px;margin:0 auto;flex:1;display:flex;flex-direction:column;
   padding:26px 22px 24px;padding-top:max(26px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));min-height:100%;}
 .ftop{display:flex;justify-content:space-between;align-items:center;gap:12px;}
-.ftop .hbtn,.fmeta{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);padding:4px 0;}
-.fmeta{text-align:right;}
+.ftop .hbtn{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);padding:4px 0;}
 .fmid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:20px 0;}
 .ftitle{font-size:27px;font-weight:600;line-height:1.18;letter-spacing:.02em;text-transform:uppercase;text-align:center;margin:0;overflow-wrap:break-word;}
 .fhead{display:flex;flex-direction:column;align-items:center;gap:13px;}
@@ -231,6 +230,19 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .mustbtn .star{font-size:14px;line-height:1;}
 .rowstar{flex:none;align-self:flex-start;font-size:17px;line-height:1;color:var(--muted);padding:2px 4px;background:none;border:none;cursor:pointer;}
 .rowstar.on{color:var(--ink);}
+/* daily big 3 marker on pile rows */
+.rowmark{display:flex;align-items:center;gap:6px;flex:none;align-self:flex-start;}
+.rowd3{flex:none;font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--chip-border);border-radius:2px;padding:4px 5px;background:var(--white);line-height:1;cursor:pointer;}
+.rowd3.on{background:var(--ink);border-color:var(--ink);color:var(--white);}
+/* plan / big 3 screen */
+.h2{font-family:var(--sans);font-weight:600;font-size:15px;letter-spacing:.04em;text-transform:uppercase;margin:28px 0 6px;}
+.plandate{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;}
+.bignum{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);flex:none;width:14px;align-self:flex-start;padding-top:2px;}
+.d3check{flex:none;align-self:flex-start;width:22px;height:22px;border:1.5px solid var(--chip-border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;background:var(--white);color:var(--white);cursor:pointer;}
+.d3check.on{background:var(--ink);border-color:var(--ink);}
+.rowtitle.done{color:var(--muted);text-decoration:line-through;}
+.planadd{margin-top:12px;}
+.carry{margin:4px 0 14px;}
 
 /* Desktop: same single-column layout, just wider and roomier. Kicks in automatically
    on wide windows; below 780px (phones) everything above is untouched. */
@@ -283,6 +295,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[]};
   var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:"",endAt:null};
   var timerSound="bell";
+  // Plan / Big 3 (Full Focus style). Weekly = free-text outcomes; Daily = linked task ids.
+  // Kept per ISO-week / per-day inside the settings blob — no schema change.
+  var plans={weeks:{},days:{}};
+  var planPick=false, wkEdit=null, wkBuf="", wkNewBuf="";
 
   function esc(s){
     return String(s).replace(/[&<>"']/g,function(c){
@@ -304,6 +320,31 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var DIMFIELD={p:"priority",u:"urgency",e:"energy",t:"time",c:"context",w:"horizon"};
   function findTask(id){ for(var i=0;i<tasks.length;i++){ if(String(tasks[i].id)===String(id)) return tasks[i]; } return null; }
   function dimDefaultVal(field){ return field==="time"?"med":field==="context"?"work":field==="horizon"?"now":""; }
+
+  // ---- plan / big 3 : date keys, labels & accessors ----
+  var MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var WEEKDAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  function pad2(n){ return n<10?("0"+n):(""+n); }
+  function dayKey(d){ d=d?new Date(d):new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+  function isoWeekKey(d){
+    d=d?new Date(d):new Date();
+    var u=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    var dayNum=(u.getUTCDay()+6)%7;                 // Mon=0 … Sun=6
+    u.setUTCDate(u.getUTCDate()-dayNum+3);           // Thursday of this week
+    var yr=u.getUTCFullYear();
+    var firstThu=new Date(Date.UTC(yr,0,4));
+    var fNum=(firstThu.getUTCDay()+6)%7;
+    firstThu.setUTCDate(firstThu.getUTCDate()-fNum+3);
+    return yr+"-W"+pad2(1+Math.round((u-firstThu)/604800000));
+  }
+  function mondayOf(d){ d=d?new Date(d):new Date(); var n=(d.getDay()+6)%7; var m=new Date(d); m.setDate(d.getDate()-n); return m; }
+  function weekLabel(){ var m=mondayOf(); return "Week of "+MONTHS[m.getMonth()]+" "+m.getDate(); }
+  function dayLabel(){ var d=new Date(); return WEEKDAYS[d.getDay()]+", "+MONTHS[d.getMonth()]+" "+d.getDate(); }
+  function weekBig3(){ var w=plans.weeks[isoWeekKey()]; return (w&&Array.isArray(w.big3))?w.big3:[]; }
+  function dayBig3(){ var x=plans.days[dayKey()]; return (x&&Array.isArray(x.big3))?x.big3:[]; }
+  function setWeekBig3(arr){ var k=isoWeekKey(); if(!plans.weeks[k]) plans.weeks[k]={}; plans.weeks[k].big3=arr; saveSettings(); }
+  function setDayBig3(arr){ var k=dayKey(); if(!plans.days[k]) plans.days[k]={}; plans.days[k].big3=arr; saveSettings(); }
+  function inDayBig3(id){ var a=dayBig3(); for(var i=0;i<a.length;i++){ if(String(a[i])===String(id)) return true; } return false; }
 
   // ---- tags ----
   function normTag(s){ return String(s||"").replace(/\s+/g," ").replace(/^\s+|\s+$/g,""); }
@@ -498,13 +539,17 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           tagVocab=d.tags.filter(function(x){ return typeof x==="string" && normTag(x); }).map(normTag);
           sortVocab();
         }
+        if(d.plans && typeof d.plans==="object"){
+          plans={ weeks:(d.plans.weeks && typeof d.plans.weeks==="object")?d.plans.weeks:{},
+                  days:(d.plans.days && typeof d.plans.days==="object")?d.plans.days:{} };
+        }
       }
     }).catch(function(){});
   }
   function saveSettings(){
     if(!sb || !user) return;
     var payload={user_id:user.id,
-      defaults:{p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w,tags:tagVocab},
+      defaults:{p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w,tags:tagVocab,plans:plans},
       updated_at:new Date().toISOString()};
     sb.from("settings").upsert(payload).then(function(res){
       if(res.error){ flash="Couldn't save settings: "+errmsg(res.error); render(); }
@@ -656,7 +701,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       var t=o[i];
       var editingTitle=String(titleEdit)===String(t.id);
       h+='<div class="row" data-act="pick" data-id="'+t.id+'" role="button" tabindex="0">'
+        +'<div class="rowmark">'
         +'<button class="rowstar'+(t.must?" on":"")+'" data-act="toggle-must-row" data-id="'+t.id+'" aria-pressed="'+(t.must?"true":"false")+'" aria-label="Must do">'+(t.must?"★":"☆")+'</button>'
+        +'<button class="rowd3'+(inDayBig3(t.id)?" on":"")+'" data-act="toggle-d3-row" data-id="'+t.id+'" aria-pressed="'+(inDayBig3(t.id)?"true":"false")+'" aria-label="Add to Daily Big 3">D3</button>'
+        +'</div>'
         +'<div class="rowtxt">'
         +(editingTitle
           ? '<div class="titleedit" data-act="noop"><input class="titlein" id="titlein" type="text" value="'+esc(titleBuf)+'" spellcheck="true" aria-label="Task">'
@@ -803,6 +851,75 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return h;
   }
 
+  function planView(){
+    var h='<h1 class="h1">Plan</h1>';
+
+    // ---- Weekly Big 3 — free-text outcomes ----
+    h+='<h2 class="h2">Weekly Big 3</h2><p class="plandate">'+esc(weekLabel())+'</p>';
+    var wk=weekBig3();
+    if(wk.length){
+      h+='<div class="list">';
+      for(var i=0;i<wk.length;i++){
+        if(wkEdit===i){
+          h+='<div class="row"><span class="bignum">'+(i+1)+'</span>'
+            +'<div class="rowtxt"><div class="titleedit"><input class="titlein" id="wkin" type="text" value="'+esc(wkBuf)+'" spellcheck="true" aria-label="Weekly outcome">'
+            +'<button class="tsmall" data-act="wk-save">Save</button><button class="tsmall" data-act="wk-cancel">Cancel</button></div></div></div>';
+        } else {
+          h+='<div class="row"><span class="bignum">'+(i+1)+'</span>'
+            +'<div class="rowtxt"><div class="rowtitle">'+esc(wk[i])+'</div></div>'
+            +'<button class="rowedit" data-act="wk-edit" data-idx="'+i+'" aria-label="Edit outcome">'+PENCIL+'</button>'
+            +'<button class="rowx" data-act="wk-remove" data-idx="'+i+'" aria-label="Remove outcome">&times;</button></div>';
+        }
+      }
+      h+='</div>';
+    } else if(wkEdit===null){
+      h+='<p class="emptyline">Name the three outcomes that would make this week a win.</p>';
+    }
+    if(wk.length<3 && wkEdit===null){
+      h+='<div class="tagaddrow planadd"><input class="tagin" id="wknew" type="text" placeholder="Add an outcome…" value="'+esc(wkNewBuf)+'" autocomplete="off" aria-label="New weekly outcome">'
+        +'<button class="btn ghost tagaddbtn" data-act="wk-add">Add</button></div>';
+    }
+
+    // ---- Daily Big 3 — linked tasks ----
+    h+='<h2 class="h2">Daily Big 3</h2><p class="plandate">'+esc(dayLabel())+'</p>';
+    var day=dayBig3(), items=[];
+    for(var j=0;j<day.length;j++){ var dt=findTask(day[j]); if(dt) items.push(dt); }
+
+    if(!items.length){
+      var yKey=dayKey(new Date(Date.now()-86400000)),
+          yd=(plans.days[yKey]&&Array.isArray(plans.days[yKey].big3))?plans.days[yKey].big3:[], nCarry=0;
+      for(var y=0;y<yd.length;y++){ var yt=findTask(yd[y]); if(yt && !yt.done) nCarry++; }
+      if(nCarry){ h+='<button class="btn ghost carry" data-act="d3-carry">Carry over '+nCarry+' unfinished from yesterday</button>'; }
+      h+='<p class="emptyline">No Big 3 yet today. Pick up to three tasks to focus on.</p>';
+    } else {
+      h+='<div class="list">';
+      for(var k=0;k<items.length;k++){
+        var it=items[k], dn=!!it.done;
+        h+='<div class="row"'+(dn?'':' data-act="pick" data-id="'+it.id+'" role="button" tabindex="0"')+'>'
+          +'<button class="d3check'+(dn?" on":"")+'" data-act="d3-done" data-id="'+it.id+'" aria-pressed="'+(dn?"true":"false")+'" aria-label="Complete">'+(dn?"✓":"")+'</button>'
+          +'<div class="rowtxt"><div class="rowtitle'+(dn?" done":"")+'">'+esc(it.text)+'</div>'+tagsHTML(it)+'</div>'
+          +'<button class="rowx" data-act="d3-remove" data-id="'+it.id+'" aria-label="Remove from Big 3">&times;</button></div>';
+      }
+      h+='</div>';
+    }
+
+    if(items.length<3){
+      if(planPick){
+        var avail=openTasks().filter(function(t){ return !inDayBig3(t.id); });
+        h+='<div class="scroll planadd">';
+        if(!avail.length){ h+='<p class="emptyline">No other open tasks. Add some in Collect first.</p>'; }
+        for(var p=0;p<avail.length;p++){
+          h+='<div class="pickrow" data-act="d3-add" data-id="'+avail[p].id+'" role="button" tabindex="0">'
+            +'<div class="rowtxt"><div class="rowtitle">'+esc(avail[p].text)+'</div>'+tagsHTML(avail[p])+'</div></div>';
+        }
+        h+='</div><button class="btn ghost planadd" data-act="d3-pick-close">Close</button>';
+      } else {
+        h+='<button class="btn ghost planadd" data-act="d3-pick-open">+ Add from your tasks</button>';
+      }
+    }
+    return h;
+  }
+
   function clockText(){
     var mm=String(Math.floor(timer.left/60));
     var ss=String(timer.left%60);
@@ -860,7 +977,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   function focusView(t){
     var h='<div class="stage"><div class="stagein">'
       +'<div class="ftop"><button class="hbtn" data-act="hist-back">&larr; all tasks</button>'
-      +'<span class="fmeta">'+esc(t.priority||"—")+' priority &middot; '+esc(t.time||"—")+'</span></div>'
+      +'<button class="hbtn hmenu" data-act="menu-toggle" aria-expanded="'+menuOpen+'">Menu</button></div>'
       +'<div class="fmid">'
       +focusHeadHTML(t)
       +'<div class="timerbox">'
@@ -892,6 +1009,20 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return h;
   }
 
+  function menuHTML(){
+    var inboxN=inboxTasks().length;
+    return '<div class="menuwrap"><div class="menuback" data-act="menu-close"></div><nav class="menu">'
+      +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
+      +'<button class="'+(screen==="plan"?"on":"")+'" data-act="nav" data-to="plan">Plan</button>'
+      +'<button class="'+(screen==="inbox"?"on":"")+'" data-act="nav" data-to="inbox">Inbox'+(inboxN?(" ("+inboxN+")"):"")+'</button>'
+      +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
+      +'<button class="'+(screen==="pile"?"on":"")+'" data-act="nav" data-to="pile">All tasks</button>'
+      +'<button class="'+(screen==="done"?"on":"")+'" data-act="nav" data-to="done">Completed</button>'
+      +'<button class="'+(screen==="settings"?"on":"")+'" data-act="nav" data-to="settings">Settings</button>'
+      +'<button data-act="signout">Log out</button>'
+      +'</nav></div>';
+  }
+
   function draw(){
     var app=document.getElementById("app");
 
@@ -907,7 +1038,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var active=null;
     if(activeId!=null){ for(var i=0;i<tasks.length;i++){ if(String(tasks[i].id)===String(activeId)) active=tasks[i]; } }
     if(screen==="focus" && active){
-      app.innerHTML=focusView(active);
+      app.innerHTML=focusView(active)+(menuOpen?menuHTML():"");
       return;
     }
 
@@ -927,19 +1058,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       +'<button class="hbtn hmenu" data-act="menu-toggle" aria-expanded="'+menuOpen+'">Menu</button>'
       +'</header><div class="bodywrap">';
     if(flash) h+='<div class="flash">'+esc(flash)+'</div>';
-    h+=(screen==="collect"?collectView():screen==="inbox"?inboxView():screen==="pile"?pileView():screen==="done"?doneView():screen==="settings"?settingsView():chooseView());
+    h+=(screen==="collect"?collectView():screen==="plan"?planView():screen==="inbox"?inboxView():screen==="pile"?pileView():screen==="done"?doneView():screen==="settings"?settingsView():chooseView());
     h+='</div></div>';
-    if(menuOpen){
-      h+='<div class="menuwrap"><div class="menuback" data-act="menu-close"></div><nav class="menu">'
-        +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
-        +'<button class="'+(screen==="inbox"?"on":"")+'" data-act="nav" data-to="inbox">Inbox'+(inboxN?(" ("+inboxN+")"):"")+'</button>'
-        +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
-        +'<button class="'+(screen==="pile"?"on":"")+'" data-act="nav" data-to="pile">All tasks</button>'
-        +'<button class="'+(screen==="done"?"on":"")+'" data-act="nav" data-to="done">Completed</button>'
-        +'<button class="'+(screen==="settings"?"on":"")+'" data-act="nav" data-to="settings">Settings</button>'
-        +'<button data-act="signout">Log out</button>'
-        +'</nav></div>';
-    }
+    if(menuOpen) h+=menuHTML();
     app.innerHTML=h;
   }
 
@@ -956,7 +1077,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     screen=scr;
     if(id!==undefined) activeId=id;
     if(scr==="choose"){ openSec=""; chooseTitle=rollChooseTitle(); }
-    menuOpen=false; editPill=null; timer.editing=false; rowTagEdit=null; titleEdit=null; focusEdit=false;
+    menuOpen=false; editPill=null; timer.editing=false; rowTagEdit=null; titleEdit=null; focusEdit=false; planPick=false; wkEdit=null;
     if(scr!=="focus") stopTimer();
     try{ history.pushState({screen:screen,activeId:activeId},""); }catch(e){}
     render();
@@ -1121,6 +1242,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       if(rd && rt) rd.innerHTML=tagDropHTML(rowTagQuery,rt.tags,"tag-row-pick","tag-row-add",rt.id);
     } else if(ev.target.id==="titlein"){
       titleBuf=ev.target.value;
+    } else if(ev.target.id==="wknew"){
+      wkNewBuf=ev.target.value;
+    } else if(ev.target.id==="wkin"){
+      wkBuf=ev.target.value;
     }
   });
 
@@ -1160,6 +1285,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     if(tg && tg.id==="titlein"){
       if(ev.key==="Enter"){ ev.preventDefault(); if(focusEdit){ focusEditDone(); } else { titleSave(); } return; }
       if(ev.key==="Escape"){ ev.preventDefault(); if(focusEdit){ focusEditCancel(); } else { titleEdit=null; render(); } return; }
+    }
+    if(tg && tg.id==="wknew" && ev.key==="Enter"){ ev.preventDefault(); var wkb=document.querySelector('[data-act="wk-add"]'); if(wkb) wkb.click(); return; }
+    if(tg && tg.id==="wkin"){
+      if(ev.key==="Enter"){ ev.preventDefault(); var wsb=document.querySelector('[data-act="wk-save"]'); if(wsb) wsb.click(); return; }
+      if(ev.key==="Escape"){ ev.preventDefault(); wkEdit=null; render(); return; }
     }
     if(ev.key==="Escape"){
       if(focusEdit){ focusEditCancel(); return; }
@@ -1335,6 +1465,76 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         });
       }
     }
+    else if(a==="toggle-d3-row"){
+      var rid=String(el.getAttribute("data-id")), darr=dayBig3().slice(), pos=-1;
+      for(var z=0;z<darr.length;z++){ if(String(darr[z])===rid){ pos=z; break; } }
+      if(pos>-1){ darr.splice(pos,1); setDayBig3(darr); flash=""; render(); }
+      else if(darr.length>=3){ flash="Daily Big 3 is full (3). Remove one first."; render();
+        setTimeout(function(){ if(flash==="Daily Big 3 is full (3). Remove one first."){ flash=""; render(); } },2000); }
+      else { darr.push(rid); setDayBig3(darr); flash=""; render(); }
+    }
+    else if(a==="d3-add"){
+      var aid=String(el.getAttribute("data-id")), aarr=dayBig3().slice();
+      if(aarr.length<3 && !inDayBig3(aid)){ aarr.push(aid); setDayBig3(aarr); }
+      planPick=false; render();
+    }
+    else if(a==="d3-remove"){
+      var xid=String(el.getAttribute("data-id"));
+      setDayBig3(dayBig3().filter(function(x){ return String(x)!==xid; }));
+      render();
+    }
+    else if(a==="d3-pick-open"){ planPick=true; render(); }
+    else if(a==="d3-pick-close"){ planPick=false; render(); }
+    else if(a==="d3-carry"){
+      var yKey=dayKey(new Date(Date.now()-86400000)),
+          yd=(plans.days[yKey]&&Array.isArray(plans.days[yKey].big3))?plans.days[yKey].big3:[], carry=[];
+      for(var yy=0;yy<yd.length && carry.length<3;yy++){ var yt2=findTask(yd[yy]); if(yt2 && !yt2.done) carry.push(String(yt2.id)); }
+      setDayBig3(carry); render();
+    }
+    else if(a==="d3-done"){
+      var cid=el.getAttribute("data-id"), ct=findTask(cid);
+      if(!ct || !sb) return;
+      var was=!!ct.done;
+      ct.done=!was; ct.doneAt=was?null:Date.now(); render();
+      if(!was){
+        var whenISO=new Date().toISOString();
+        sb.from("tasks").update({done:true,done_at:whenISO}).eq("id",cid).then(function(res){
+          if(res.error && /done_at/i.test(res.error.message||"")) return sb.from("tasks").update({done:true}).eq("id",cid);
+          return res;
+        }).then(function(res){ if(res && res.error){ ct.done=false; ct.doneAt=null; flash="Couldn't complete: "+res.error.message; render(); } });
+      } else {
+        sb.from("tasks").update({done:false,done_at:null}).eq("id",cid).then(function(res){
+          if(res.error && /done_at/i.test(res.error.message||"")) return sb.from("tasks").update({done:false}).eq("id",cid);
+          return res;
+        }).then(function(res){ if(res && res.error){ ct.done=true; flash="Couldn't update: "+res.error.message; render(); } });
+      }
+    }
+    else if(a==="wk-add"){
+      var wia=document.getElementById("wknew"); if(wia) wkNewBuf=wia.value;
+      var wv=normTag(wkNewBuf), warr=weekBig3().slice();
+      if(wv && warr.length<3){ warr.push(wv); setWeekBig3(warr); }
+      wkNewBuf=""; render();
+      var wib=document.getElementById("wknew"); if(wib){ try{ wib.focus(); }catch(e){} }
+    }
+    else if(a==="wk-edit"){
+      wkEdit=parseInt(el.getAttribute("data-idx"),10); var wke=weekBig3(); wkBuf=wke[wkEdit]||""; render();
+      var wic=document.getElementById("wkin"); if(wic){ try{ wic.focus(); wic.select(); }catch(e){} }
+    }
+    else if(a==="wk-save"){
+      var wid=document.getElementById("wkin"); if(wid) wkBuf=wid.value;
+      var wv2=normTag(wkBuf), warr2=weekBig3().slice();
+      if(wkEdit!=null && wkEdit>-1 && wkEdit<warr2.length){
+        if(wv2){ warr2[wkEdit]=wv2; } else { warr2.splice(wkEdit,1); }
+        setWeekBig3(warr2);
+      }
+      wkEdit=null; render();
+    }
+    else if(a==="wk-cancel"){ wkEdit=null; render(); }
+    else if(a==="wk-remove"){
+      var wri=parseInt(el.getAttribute("data-idx"),10), warr3=weekBig3().slice();
+      if(wri>-1 && wri<warr3.length){ warr3.splice(wri,1); setWeekBig3(warr3); }
+      render();
+    }
     else if(a==="go-choose"){ flash=""; setScreen("choose"); }
     else if(a==="go-pile"){ flash=""; setScreen("pile"); }
     else if(a==="edit-pill"){
@@ -1498,7 +1698,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var st=ev.state||{};
     screen=st.screen||"collect";
     activeId=st.activeId||null;
-    menuOpen=false; editPill=null; timer.editing=false; rowTagEdit=null; titleEdit=null; focusEdit=false;
+    menuOpen=false; editPill=null; timer.editing=false; rowTagEdit=null; titleEdit=null; focusEdit=false; planPick=false; wkEdit=null;
     if(screen==="focus") resetTimer(); else stopTimer();
     render();
   });
