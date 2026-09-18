@@ -216,6 +216,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .fnote{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:center;margin:0 0 14px;}
 .complete{margin-bottom:18px;font-size:12.5px;}
 .elsebtn{display:block;width:100%;text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:4px 0;}
+.elserow{display:flex;justify-content:center;align-items:center;gap:14px;}
+.elserow .elsebtn{width:auto;}
+.elsedot{color:var(--muted);font-size:9px;opacity:.55;}
 
 #cf{position:fixed;inset:0;pointer-events:none;z-index:10000;}
 .keepbtn{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);border:1px solid var(--ink);border-radius:20px;padding:4px 10px;flex:none;white-space:nowrap;cursor:pointer;background:none;}
@@ -265,7 +268,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var ARC_C=622.04; // 2π·99
 
   var tasks=[];
-  var screen="collect", activeId=null, method="deal", openSec="", flash="", chooseTitle=rollChooseTitle();
+  var screen="collect", activeId=null, method="deal", dealCtx=null, openSec="", flash="", chooseTitle=rollChooseTitle();
   var booting=true;
   var user=null, authedId, authMode="signin", authEmail="", authPass="", authMsg="", authBusy=false;
   var menuOpen=false;
@@ -558,6 +561,24 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     if(!pool.length) pool=list;
     if(!pool.length) return null;
     return pool[Math.floor(Math.random()*pool.length)];
+  }
+  // The candidate pool for the current pick "bucket": Zero-in matches, the
+  // Dealer's-choice context, or (as a fallback) all open tasks.
+  function bucketPool(){
+    if(method==="filter") return matching();
+    if(method==="deal") return openTasks().filter(function(t){ return t.context===dealCtx; });
+    return openTasks();
+  }
+  // Buckets that yield a random "next" task. A specific pick has no bucket, so
+  // finishing/skipping one sends you back to the task list to choose again.
+  function bucketIsRandom(){ return method==="filter" || method==="deal"; }
+  // Go to the Choose screen with the "Specific task" list open, ready to pick.
+  function gotoPickList(){ setScreen("choose", null); openSec="pick"; render(); }
+  // Swap the focus screen to another task (keeps us on the timer), fresh timer.
+  function advanceTo(id){
+    activeId=id; resetTimer();
+    try{ history.replaceState({screen:"focus",activeId:activeId},""); }catch(e){}
+    render();
   }
 
   function chips(label,dim,val,multi,scale){
@@ -863,8 +884,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     h+='<div class="fbottom">';
     if(flash) h+='<p class="fnote">'+esc(flash)+'</p>';
     h+='<button class="btn complete" data-act="done">Complete</button>'
+      +'<div class="elserow">'
       +'<button class="elsebtn" data-act="another">Something else</button>'
-      +'</div></div></div>';
+      +'<span class="elsedot" aria-hidden="true">&middot;</span>'
+      +'<button class="elsebtn" data-act="switch-bucket">Switch it up</button>'
+      +'</div></div></div></div>';
     return h;
   }
 
@@ -1363,7 +1387,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       var pool=openTasks().filter(function(t){ return t.context===ctx; });
       var td=pickOne(pool,null);
       if(!td) return;
-      method="deal"; resetTimer(); setScreen("focus", td.id);
+      method="deal"; dealCtx=ctx; resetTimer(); setScreen("focus", td.id);
     }
     else if(a==="show-one"){
       var t1=pickOne(matching(),null);
@@ -1412,21 +1436,27 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         if(screen==="choose") render();
       });
       setTimeout(function(){
-        flash="Done. That is one less.";
-        setScreen("choose", null);
-        setTimeout(function(){ if(flash==="Done. That is one less."){ flash=""; if(screen==="choose") render(); } },2600);
+        var msg;
+        if(!bucketIsRandom()){
+          // Specific task: back to the task list to choose the next one.
+          msg="Done. Pick your next."; flash=msg; gotoPickList();
+        } else {
+          var nx=pickOne(bucketPool().filter(function(t){ return String(t.id)!==String(did); }),null);
+          if(nx){ msg="Done. Next up."; flash=msg; advanceTo(nx.id); }
+          else { msg="Done. That was the last one here."; flash=msg; setScreen("choose", null); }
+        }
+        setTimeout(function(){ if(flash===msg){ flash=""; render(); } },2600);
       },1100);
     }
     else if(a==="another"){
-      var pool=(method==="filter")?matching():openTasks();
-      var alt=pool.filter(function(t){ return String(t.id)!==String(activeId); });
-      if(!alt.length) alt=openTasks().filter(function(t){ return String(t.id)!==String(activeId); });
-      if(!alt.length){ flash="Nothing else in the pile."; render(); return; }
+      if(!bucketIsRandom()){ gotoPickList(); return; }   // specific pick → back to the task list
+      var alt=bucketPool().filter(function(t){ return String(t.id)!==String(activeId); });
+      if(!alt.length){ flash="Nothing else in this bucket."; render(); return; }
       var nx=pickOne(alt,null);
       if(!nx) return;
-      activeId=nx.id; flash=""; resetTimer(); render();
-      try{ history.replaceState({screen:"focus",activeId:activeId},""); }catch(e){}
+      flash=""; advanceTo(nx.id);
     }
+    else if(a==="switch-bucket"){ setScreen("choose", null); }
   });
 
   window.addEventListener("popstate",function(ev){
