@@ -188,6 +188,14 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .fhead{display:flex;flex-direction:column;align-items:center;gap:13px;}
 .ftags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
 .ftags .tagpill{font-size:9px;padding:4px 8px;}
+.fedit{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border:1px solid var(--chip-border);border-radius:2px;background:var(--white);padding:5px 12px;margin-top:2px;}
+.fedit svg{width:12px;height:12px;}
+.fhead.editing{width:100%;gap:14px;}
+.ftitlein{width:100%;max-width:440px;font-family:var(--sans);font-size:20px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;text-align:center;color:var(--ink);background:var(--white);border:1px solid var(--chip-border);border-radius:2px;padding:11px 12px;}
+.ftitlein:focus{outline:none;border-color:var(--ink);}
+.fhead.editing .rowtags{width:100%;max-width:440px;margin-top:0;justify-content:center;}
+.fhead.editing .tagpill{font-size:9px;padding:4px 8px;}
+.fdone{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--white);background:var(--ink);border-radius:2px;padding:9px 22px;margin-top:2px;}
 .timerbox{position:relative;width:224px;height:224px;}
 .timerbox svg{position:absolute;inset:0;width:224px;height:224px;}
 .face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;}
@@ -268,6 +276,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   // Tags (projects): the user's vocabulary lives in settings; each task carries a tags[] array.
   var tagVocab=[], tagQuery="", tagEdit=null, tagEditBuf="", tagNewBuf="";
   var rowTagEdit=null, rowTagQuery="", titleEdit=null, titleBuf="";   // inline editing on the pile
+  var focusEdit=false;   // when true, the focus/timer screen shows its inline title + tag editor
   var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[]};
   var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:""};
   var timerSound="bell";
@@ -767,16 +776,47 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     for(var i=0;i<tg.length;i++){ h+='<span class="tagpill">'+esc(tg[i])+'</span>'; }
     return h+'</div>';
   }
+  // Title + tags block on the focus screen. Calm read-only view by default,
+  // with an Edit toggle that swaps in an inline title field and the shared
+  // editable tag shelf (reused from the pile). See focus-edit* actions.
+  function focusHeadHTML(t){
+    if(focusEdit){
+      return '<div class="fhead editing" data-act="noop">'
+        +'<input class="ftitlein" id="titlein" type="text" value="'+esc(titleBuf)+'" aria-label="Task">'
+        +rowTagShelf(t)
+        +'<button class="fdone" data-act="focus-edit-done">Done</button>'
+        +'</div>';
+    }
+    return '<div class="fhead">'
+      +'<h1 class="ftitle">'+esc(t.text)+'</h1>'
+      +focusTagsHTML(t)
+      +'<button class="fedit" data-act="focus-edit" aria-label="Edit task">'+PENCIL+'<span>Edit</span></button>'
+      +'</div>';
+  }
+  // Commit a title change (if any) and leave focus edit mode. Tags persist as
+  // they are added/removed, so there is nothing extra to save for them here.
+  function focusEditDone(){
+    var i=document.getElementById("titlein"); if(i) titleBuf=i.value;
+    var t=findTask(activeId);
+    if(t){
+      var nt=(titleBuf||"").replace(/^\s+|\s+$/g,"");
+      if(nt && nt!==t.text){
+        var old=t.text; t.text=nt;
+        if(sb) sb.from("tasks").update({text:nt}).eq("id",t.id).then(function(res){
+          if(res.error){ t.text=old; flash="Couldn't rename: "+res.error.message; render(); }
+        });
+      }
+    }
+    focusEdit=false; titleEdit=null; rowTagEdit=null; rowTagQuery=""; render();
+  }
+  function focusEditCancel(){ focusEdit=false; titleEdit=null; rowTagEdit=null; rowTagQuery=""; render(); }
 
   function focusView(t){
     var h='<div class="stage"><div class="stagein">'
       +'<div class="ftop"><button class="hbtn" data-act="hist-back">&larr; all tasks</button>'
       +'<span class="fmeta">'+esc(t.priority||"—")+' priority &middot; '+esc(t.time||"—")+'</span></div>'
       +'<div class="fmid">'
-      +'<div class="fhead">'
-      +'<h1 class="ftitle">'+esc(t.text)+'</h1>'
-      +focusTagsHTML(t)
-      +'</div>'
+      +focusHeadHTML(t)
       +'<div class="timerbox">'
       +'<svg viewBox="0 0 246 246" aria-hidden="true">'
       +'<circle cx="123" cy="123" r="116" fill="none" stroke="#D5D9DB" stroke-width="7" stroke-dasharray="1.6 7.5"></circle>'
@@ -867,7 +907,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     screen=scr;
     if(id!==undefined) activeId=id;
     if(scr==="choose"){ openSec=""; chooseTitle=rollChooseTitle(); }
-    menuOpen=false; editPill=null; timer.editing=false; rowTagEdit=null; titleEdit=null;
+    menuOpen=false; editPill=null; timer.editing=false; rowTagEdit=null; titleEdit=null; focusEdit=false;
     if(scr!=="focus") stopTimer();
     try{ history.pushState({screen:screen,activeId:activeId},""); }catch(e){}
     render();
@@ -1041,10 +1081,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       if(ev.key==="Escape"){ ev.preventDefault(); rowTagEdit=null; rowTagQuery=""; render(); return; }
     }
     if(tg && tg.id==="titlein"){
-      if(ev.key==="Enter"){ ev.preventDefault(); titleSave(); return; }
-      if(ev.key==="Escape"){ ev.preventDefault(); titleEdit=null; render(); return; }
+      if(ev.key==="Enter"){ ev.preventDefault(); if(focusEdit){ focusEditDone(); } else { titleSave(); } return; }
+      if(ev.key==="Escape"){ ev.preventDefault(); if(focusEdit){ focusEditCancel(); } else { titleEdit=null; render(); } return; }
     }
     if(ev.key==="Escape"){
+      if(focusEdit){ focusEditCancel(); return; }
       if(timer.editing){ timer.editing=false; render(); return; }
       if(menuOpen){ menuOpen=false; render(); return; }
     }
@@ -1253,6 +1294,12 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     }
     else if(a==="title-save"){ titleSave(); }
     else if(a==="title-cancel"){ titleEdit=null; render(); }
+    else if(a==="focus-edit"){
+      var fe=findTask(activeId); if(!fe) return;
+      focusEdit=true; titleEdit=fe.id; titleBuf=fe.text; rowTagEdit=null; rowTagQuery=""; render();
+      var fin=document.getElementById("titlein"); if(fin){ try{ fin.focus(); fin.select(); }catch(e){} }
+    }
+    else if(a==="focus-edit-done"){ focusEditDone(); }
     else if(a==="tag-row-open"){
       titleEdit=null; rowTagEdit=el.getAttribute("data-id"); rowTagQuery=""; render();
       var rin=document.getElementById("rowtagin"); if(rin){ try{ rin.focus(); }catch(e){} }
@@ -1343,7 +1390,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var st=ev.state||{};
     screen=st.screen||"collect";
     activeId=st.activeId||null;
-    menuOpen=false; editPill=null; timer.editing=false; rowTagEdit=null; titleEdit=null;
+    menuOpen=false; editPill=null; timer.editing=false; rowTagEdit=null; titleEdit=null; focusEdit=false;
     if(screen==="focus") resetTimer(); else stopTimer();
     render();
   });
