@@ -313,15 +313,40 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return tagVocab.filter(function(t){ return t.toLowerCase().indexOf(ql)===0 && !hasTag(have,t); });
   }
   function sortVocab(){ tagVocab.sort(function(a,b){ return a.toLowerCase()<b.toLowerCase()?-1:(a.toLowerCase()>b.toLowerCase()?1:0); }); }
+  // Tags used on the most recently created tasks (tasks are loaded newest-first),
+  // for the "recent tags" popup shown when the tag field is empty. Skips tags
+  // already applied (have) and fills any spare slots from the rest of the vocab.
+  function recentTags(have,limit){
+    have=have||[]; limit=limit||8;
+    var seen={}, out=[];
+    function add(name){
+      var canon=tagExact(name)||name, key=normTag(canon).toLowerCase();
+      if(!key || seen[key] || hasTag(have,canon)) return;
+      seen[key]=1; out.push(canon);
+    }
+    for(var i=0;i<tasks.length && out.length<limit;i++){
+      var tg=tasks[i].tags||[];
+      for(var j=0;j<tg.length && out.length<limit;j++){ add(tg[j]); }
+    }
+    for(var k=0;k<tagVocab.length && out.length<limit;k++){ add(tagVocab[k]); }
+    return out;
+  }
   function createTag(name){ name=normTag(name); if(!name || tagExact(name)) return; tagVocab.push(name); sortVocab(); saveSettings(); }
   // Dropdown options for a tag query. Defaults target the Collect draft; pass
   // have/pickAct/addAct/id to target a specific task on the pile.
   function tagDropHTML(q,have,pickAct,addAct,id){
-    q=normTag(q===undefined?tagQuery:q); if(!q) return "";
+    q=normTag(q===undefined?tagQuery:q);
     have=have||draft.tags; pickAct=pickAct||"tag-pick"; addAct=addAct||"tag-add";
     var idAttr=(id!=null)?' data-id="'+id+'"':'';
-    var m=tagMatches(q,have), exact=tagExact(q), h="";
-    for(var i=0;i<m.length;i++){ h+='<button class="tagopt" data-act="'+pickAct+'"'+idAttr+' data-tag="'+esc(m[i])+'">'+esc(m[i])+'</button>'; }
+    var h="", i;
+    if(!q){
+      // Empty field: offer recent tags to pick from; live-filters once typing starts.
+      var r=recentTags(have);
+      for(i=0;i<r.length;i++){ h+='<button class="tagopt" data-act="'+pickAct+'"'+idAttr+' data-tag="'+esc(r[i])+'">'+esc(r[i])+'</button>'; }
+      return h;
+    }
+    var m=tagMatches(q,have), exact=tagExact(q);
+    for(i=0;i<m.length;i++){ h+='<button class="tagopt" data-act="'+pickAct+'"'+idAttr+' data-tag="'+esc(m[i])+'">'+esc(m[i])+'</button>'; }
     if(!exact) h+='<button class="tagopt add" data-act="'+addAct+'"'+idAttr+' data-tag="'+esc(q)+'">+ Add &ldquo;'+esc(q)+'&rdquo;</button>';
     return h;
   }
@@ -335,7 +360,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       h+='</div>';
     }
     h+='<input class="tagin" id="tagin" type="text" placeholder="Tag a project…" value="'+esc(tagQuery)+'" autocomplete="off" aria-label="Tag">'
-      +'<div class="tagdrop" id="tagdrop">'+tagDropHTML()+'</div></div>';
+      +'<div class="tagdrop" id="tagdrop">'+(normTag(tagQuery)?tagDropHTML():"")+'</div></div>';
     return h;
   }
   function refreshTagBox(){
@@ -1104,6 +1129,24 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           ev.preventDefault(); t.click();
         }
       }
+    }
+  });
+
+  // The Collect tag field is always on screen, so its recent-tags list is shown
+  // only while the field is focused (the pile/timer tag editors only exist when
+  // open, so they show it on their own via tagDropHTML).
+  document.addEventListener("focusin",function(ev){
+    if(ev.target && ev.target.id==="tagin"){
+      var dd=document.getElementById("tagdrop"); if(dd) dd.innerHTML=tagDropHTML();
+    }
+  });
+  document.addEventListener("focusout",function(ev){
+    if(ev.target && ev.target.id==="tagin"){
+      setTimeout(function(){
+        var ti=document.getElementById("tagin");
+        if(ti && document.activeElement===ti) return;
+        var dd=document.getElementById("tagdrop"); if(dd) dd.innerHTML="";
+      },150);
     }
   });
 
