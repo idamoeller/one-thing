@@ -281,7 +281,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var rowTagEdit=null, rowTagQuery="", titleEdit=null, titleBuf="";   // inline editing on the pile
   var focusEdit=false;   // when true, the focus/timer screen shows its inline title + tag editor
   var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[]};
-  var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:""};
+  var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:"",endAt:null};
   var timerSound="bell";
 
   function esc(s){
@@ -962,21 +962,49 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     render();
   }
 
-  function stopTimer(){ timer.run=false; if(timer.iv){ clearInterval(timer.iv); timer.iv=null; } }
+  // Timestamp-based countdown: while running we track the wall-clock end time
+  // (timer.endAt) and derive the remaining seconds from it, so the timer stays
+  // accurate even when iOS Safari throttles or suspends the tab (backgrounded,
+  // another app, screen locked). timer.left holds the frozen remaining when paused.
+  function remaining(){ return Math.max(0, Math.ceil((timer.endAt-Date.now())/1000)); }
+  function stopTimer(){
+    if(timer.run && timer.endAt) timer.left=remaining();   // freeze remaining on pause
+    timer.run=false; timer.endAt=null;
+    if(timer.iv){ clearInterval(timer.iv); timer.iv=null; }
+  }
   function resetTimer(){ stopTimer(); timer.left=timer.mins*60; }
+  function startTimer(){
+    if(timer.left<=0) timer.left=timer.mins*60;
+    timer.endAt=Date.now()+timer.left*1000;
+    timer.run=true;
+    if(timer.iv) clearInterval(timer.iv);
+    timer.iv=setInterval(tick,250);
+  }
+  function paintTimer(){
+    var c=document.getElementById("clock"); if(c) c.textContent=clockText();
+    var arc=document.getElementById("arc"); if(arc) arc.setAttribute("stroke-dasharray", arcDash());
+  }
   function tick(){
-    timer.left=Math.max(0,timer.left-1);
-    var c=document.getElementById("clock");
-    if(c) c.textContent=clockText();
-    var arc=document.getElementById("arc");
-    if(arc) arc.setAttribute("stroke-dasharray", arcDash());
-    if(timer.left===0){
-      stopTimer(); timerAlarm();
-      timer.left=timer.mins*60;            // reset so a tap restarts
-      flash="Time. Stretch, then decide.";
-      render();
-      setTimeout(function(){ if(flash==="Time. Stretch, then decide."){ flash=""; if(screen==="focus") render(); } },2600);
-    }
+    if(!timer.run) return;
+    timer.left=remaining();
+    if(timer.left<=0){ fireTimerEnd(); return; }
+    paintTimer();
+  }
+  function fireTimerEnd(){
+    stopTimer();
+    timer.left=timer.mins*60;              // reset so a tap restarts
+    timerAlarm();
+    flash="Time. Stretch, then decide.";
+    render();
+    setTimeout(function(){ if(flash==="Time. Stretch, then decide."){ flash=""; if(screen==="focus") render(); } },2600);
+  }
+  // Resync the instant we're visible again — the throttled/suspended interval may
+  // have missed ticks while backgrounded (and the timer may have elapsed away).
+  function resyncTimer(){
+    if(!timer.run || !timer.endAt) return;
+    timer.left=remaining();
+    if(timer.left<=0) fireTimerEnd();
+    else paintTimer();
   }
   var audioCtx=null;
   function getAudio(){
@@ -1173,6 +1201,13 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       },150);
     }
   });
+
+  // iOS Safari throttles/suspends JS timers when the tab is backgrounded or the
+  // screen locks; recompute the countdown from the wall clock the moment we're
+  // back so it never drifts or stalls.
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) resyncTimer(); });
+  window.addEventListener("pageshow",function(){ resyncTimer(); });
+  window.addEventListener("focus",function(){ resyncTimer(); });
 
   document.addEventListener("click",function(ev){
     var el=ev.target;
@@ -1403,7 +1438,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     else if(a==="toggle"){
       if(timer.editing) return;
       if(timer.run){ stopTimer(); }
-      else { flash=""; getAudio(); timer.run=true; timer.iv=setInterval(tick,1000); }
+      else { flash=""; getAudio(); startTimer(); }
       render();
     }
     else if(a==="settime"){
