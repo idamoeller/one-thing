@@ -188,8 +188,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .fhead{display:flex;flex-direction:column;align-items:center;gap:13px;}
 .ftags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
 .ftags .tagpill{font-size:9px;padding:4px 8px;}
-.fedit{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border:1px solid var(--chip-border);border-radius:2px;background:var(--white);padding:5px 12px;margin-top:2px;}
-.fedit svg{width:12px;height:12px;}
+.fedit{display:inline-flex;align-items:center;justify-content:center;color:var(--muted);border:1px solid var(--chip-border);border-radius:2px;background:var(--white);padding:8px 11px;margin-top:2px;}
+.fedit svg{width:16px;height:16px;}
 .fhead.editing{width:100%;gap:14px;}
 .ftitlein{width:100%;max-width:440px;font-family:var(--sans);font-size:20px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;text-align:center;color:var(--ink);background:var(--white);border:1px solid var(--chip-border);border-radius:2px;padding:11px 12px;}
 .ftitlein:focus{outline:none;border-color:var(--ink);}
@@ -836,7 +836,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return '<div class="fhead">'
       +'<h1 class="ftitle">'+esc(t.text)+'</h1>'
       +focusTagsHTML(t)
-      +'<button class="fedit" data-act="focus-edit" aria-label="Edit task">'+PENCIL+'<span>Edit</span></button>'
+      +'<button class="fedit" data-act="focus-edit" aria-label="Edit task" title="Edit task">'+PENCIL+'</button>'
       +'</div>';
   }
   // Commit a title change (if any) and leave focus edit mode. Tags persist as
