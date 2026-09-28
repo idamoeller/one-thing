@@ -238,6 +238,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 /* plan / big 3 screen */
 .h2{font-family:var(--sans);font-weight:600;font-size:15px;letter-spacing:.04em;text-transform:uppercase;margin:28px 0 6px;}
 .plandate{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;}
+.draghandle{flex:none;align-self:flex-start;width:18px;margin-left:-4px;padding-top:1px;font-size:14px;line-height:1;letter-spacing:-3px;color:var(--muted);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;}
+[data-draglist] .row{transition:transform .15s ease;}
+[data-draglist] .row.dragging{transition:none;position:relative;z-index:2;background:var(--surface);box-shadow:0 6px 18px rgba(16,19,20,.12);cursor:grabbing;}
 .bignum{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);flex:none;width:14px;align-self:flex-start;padding-top:2px;}
 .d3check{flex:none;align-self:flex-start;width:22px;height:22px;border:1.5px solid var(--chip-border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;background:var(--white);color:var(--white);cursor:pointer;}
 .d3check.on{background:var(--ink);border-color:var(--ink);}
@@ -1010,6 +1013,63 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return h;
   }
 
+  // ---- Drag to reorder the Big 3 lists (pointer events: mouse + touch) ----
+  var DRAG_HANDLE='<span class="draghandle" data-act="noop" aria-hidden="true">&#8942;&#8942;</span>';
+  var drag=null, dragSuppressClick=0;
+  document.addEventListener("pointerdown",function(ev){
+    var hd=ev.target.closest && ev.target.closest(".draghandle");
+    if(!hd || (ev.button!==undefined && ev.button!==0)) return;
+    var row=hd.closest("[data-dragid]"), list=hd.closest("[data-draglist]");
+    if(!row || !list) return;
+    ev.preventDefault();
+    var rows=Array.prototype.slice.call(list.querySelectorAll("[data-dragid]"));
+    var mids=rows.map(function(r){ var b=r.getBoundingClientRect(); return b.top+b.height/2; });
+    drag={list:list,row:row,rows:rows,mids:mids,from:rows.indexOf(row),to:rows.indexOf(row),
+          startY:ev.clientY,h:row.getBoundingClientRect().height,pid:ev.pointerId};
+    try{ hd.setPointerCapture(ev.pointerId); }catch(e){}
+    row.classList.add("dragging");
+  });
+  document.addEventListener("pointermove",function(ev){
+    if(!drag || ev.pointerId!==drag.pid) return;
+    ev.preventDefault();
+    var dy=ev.clientY-drag.startY, c=drag.mids[drag.from]+dy, to=0;
+    for(var i=0;i<drag.mids.length;i++){ if(i!==drag.from && c>drag.mids[i]) to++; }
+    drag.to=to;
+    drag.row.style.transform="translateY("+dy+"px)";
+    for(var j=0;j<drag.rows.length;j++){
+      if(j===drag.from) continue;
+      var sh=0;
+      if(drag.from<to && j>drag.from && j<=to) sh=-drag.h;
+      if(drag.from>to && j<drag.from && j>=to) sh=drag.h;
+      drag.rows[j].style.transform=sh?("translateY("+sh+"px)"):"";
+    }
+  });
+  function endDrag(ev){
+    if(!drag || ev.pointerId!==drag.pid) return;
+    var d=drag; drag=null;
+    for(var i=0;i<d.rows.length;i++){ d.rows[i].style.transform=""; }
+    d.row.classList.remove("dragging");
+    dragSuppressClick=Date.now();
+    if(ev.type==="pointercancel" || d.to===d.from) return;
+    var ids=d.rows.map(function(r){ return r.getAttribute("data-dragid"); });
+    var moved=ids.splice(d.from,1)[0]; ids.splice(d.to,0,moved);
+    if(d.list.getAttribute("data-draglist")==="wk"){
+      var wk=weekBig3();
+      setWeekBig3(ids.map(function(ix){ return wk[+ix]; }));
+    } else {
+      // Keep any ids not shown (deleted tasks) after the visible ones.
+      var rest=dayBig3().filter(function(x){ return ids.indexOf(String(x))<0; });
+      setDayBig3(ids.concat(rest));
+    }
+    render();
+  }
+  document.addEventListener("pointerup",endDrag);
+  document.addEventListener("pointercancel",endDrag);
+  // Swallow the click that follows a drag so it doesn't start the task.
+  document.addEventListener("click",function(ev){
+    if(dragSuppressClick && Date.now()-dragSuppressClick<400){ dragSuppressClick=0; ev.stopPropagation(); ev.preventDefault(); }
+  },true);
+
   function planView(){
     var h='<h1 class="h1">Plan</h1>';
 
@@ -1017,14 +1077,15 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     h+='<h2 class="h2">Weekly Big 3</h2><p class="plandate">'+esc(weekLabel())+'</p>';
     var wk=weekBig3();
     if(wk.length){
-      h+='<div class="list">';
+      var wkDrag=wk.length>1 && wkEdit===null;
+      h+='<div class="list"'+(wkDrag?' data-draglist="wk"':'')+'>';
       for(var i=0;i<wk.length;i++){
         if(wkEdit===i){
           h+='<div class="row"><span class="bignum">'+(i+1)+'</span>'
             +'<div class="rowtxt"><div class="titleedit"><input class="titlein" id="wkin" type="text" value="'+esc(wkBuf)+'" spellcheck="true" aria-label="Weekly outcome">'
             +'<button class="tsmall" data-act="wk-save">Save</button><button class="tsmall" data-act="wk-cancel">Cancel</button></div></div></div>';
         } else {
-          h+='<div class="row"><span class="bignum">'+(i+1)+'</span>'
+          h+='<div class="row"'+(wkDrag?' data-dragid="'+i+'"':'')+'>'+(wkDrag?DRAG_HANDLE:'')+'<span class="bignum">'+(i+1)+'</span>'
             +'<div class="rowtxt"><div class="rowtitle">'+esc(wk[i])+'</div></div>'
             +'<button class="rowedit" data-act="wk-edit" data-idx="'+i+'" aria-label="Edit outcome">'+PENCIL+'</button>'
             +'<button class="rowx" data-act="wk-remove" data-idx="'+i+'" aria-label="Remove outcome">&times;</button></div>';
@@ -1051,10 +1112,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       if(nCarry){ h+='<button class="btn ghost carry" data-act="d3-carry">Carry over '+nCarry+' unfinished from yesterday</button>'; }
       h+='<p class="emptyline">No Big 3 yet today. Pick up to three tasks to focus on.</p>';
     } else {
-      h+='<div class="list">';
+      var dDrag=items.length>1;
+      h+='<div class="list"'+(dDrag?' data-draglist="d3"':'')+'>';
       for(var k=0;k<items.length;k++){
         var it=items[k], dn=!!it.done;
-        h+='<div class="row"'+(dn?'':' data-act="pick" data-id="'+it.id+'" role="button" tabindex="0"')+'>'
+        h+='<div class="row"'+(dDrag?' data-dragid="'+esc(String(it.id))+'"':'')+(dn?'':' data-act="pick" data-id="'+it.id+'" role="button" tabindex="0"')+'>'+(dDrag?DRAG_HANDLE:'')
           +'<button class="d3check'+(dn?" on":"")+'" data-act="d3-done" data-id="'+it.id+'" aria-pressed="'+(dn?"true":"false")+'" aria-label="Complete">'+(dn?"✓":"")+'</button>'
           +'<div class="rowtxt"><div class="rowtitle'+(dn?" done":"")+'">'+esc(it.text)+'</div>'+tagsHTML(it)+'</div>'
           +'<button class="rowx" data-act="d3-remove" data-id="'+it.id+'" aria-label="Remove from Big 3">&times;</button></div>';
