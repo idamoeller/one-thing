@@ -307,7 +307,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var tagVocab=[], tagQuery="", tagEdit=null, tagEditBuf="", tagNewBuf="";
   var rowTagEdit=null, rowTagQuery="", titleEdit=null, titleBuf="";   // inline editing on the pile
   var focusEdit=false;   // when true, the focus/timer screen shows its inline title + tag editor
-  var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[]};
+  var filters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[],d3:false};
   // Pile view filter (independent of the Choose "Zero in" filters above). Multi-select
   // per dimension + tags, plus starred/D3 flags. Purely a view filter; never picks.
   var pileFilterOpen=false;
@@ -628,7 +628,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return nowTasks().filter(function(t){
       return inF(filters.priority,t.priority) && inF(filters.urgency,t.urgency)
           && inF(filters.energy,t.energy) && inF(filters.time,t.time)
-          && inF(filters.context,t.context) && tagOK(t);
+          && inF(filters.context,t.context) && tagOK(t)
+          && (!filters.d3 || inDayBig3(t.id));
     });
   }
   // Uniformly random pick from the pool (no priority weighting).
@@ -929,7 +930,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           }
           h+='</div>';
         } else {
-          h+=chips("Priority","priority",filters.priority,true,LEVELS)
+          var nd3=nowTasks().filter(function(t){ return inDayBig3(t.id); }).length;
+          h+='<div class="dial"><span class="clbl">Marks</span><div class="chips two">'
+            +'<button class="chip'+(filters.d3?" on":"")+'" aria-pressed="'+filters.d3+'" data-act="zflag" data-flag="d3"'+((nd3||filters.d3)?"":" disabled")+'>D3 today · '+nd3+'</button>'
+            +'</div></div>'
+            +chips("Priority","priority",filters.priority,true,LEVELS)
             +chips("Urgency","urgency",filters.urgency,true,LEVELS)
             +chips("Energy","energy",filters.energy,true,LEVELS)
             +chips("Time","time",filters.time,true,TIMES)
@@ -1576,6 +1581,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       } else {
         draft[dim]=val;
       }
+      render();
+    }
+    else if(a==="zflag"){
+      var zf=el.getAttribute("data-flag");
+      filters[zf]=!filters[zf];
       render();
     }
     else if(a==="pchip"){
