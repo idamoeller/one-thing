@@ -374,6 +374,12 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   // ---- tags ----
   function normTag(s){ return String(s||"").replace(/\s+/g," ").replace(/^\s+|\s+$/g,""); }
   function tagEq(a,b){ return normTag(a).toLowerCase()===normTag(b).toLowerCase(); }
+  // Index of val in a filter list; tags compare case-insensitively.
+  function listIndex(arr,val,dim){
+    if(dim!=="tags") return arr.indexOf(val);
+    for(var i=0;i<arr.length;i++){ if(tagEq(arr[i],val)) return i; }
+    return -1;
+  }
   function hasTag(list,name){ for(var i=0;i<list.length;i++){ if(tagEq(list[i],name)) return true; } return false; }
   function tagExact(q){ for(var i=0;i<tagVocab.length;i++){ if(tagEq(tagVocab[i],q)) return tagVocab[i]; } return null; }
   function tagMatches(q,have){
@@ -665,12 +671,25 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return h+'</div></div>';
   }
 
+  // Tags actually carried by these tasks (plus any already selected, so they can
+  // be cleared), sorted. Built from the tasks rather than just the Settings
+  // vocabulary, so tags that arrived on imported tasks still show up.
+  function tagsInUse(list,selected){
+    var out=[];
+    function add(x){ x=normTag(x); if(x && !hasTag(out,x)) out.push(tagExact(x)||x); }
+    for(var i=0;i<list.length;i++){ var tg=list[i].tags||[]; for(var j=0;j<tg.length;j++) add(tg[j]); }
+    for(var k=0;k<selected.length;k++) add(selected[k]);
+    out.sort(function(a,b){ return a.toLowerCase()<b.toLowerCase()?-1:(a.toLowerCase()>b.toLowerCase()?1:0); });
+    return out;
+  }
   // Multi-select tag chips for the Choose criteria filter.
   function tagFilterRow(){
+    var tv=tagsInUse(nowTasks(),filters.tags);
+    if(!tv.length) return "";
     var h='<div class="dial tagsdial"><span class="clbl">Tags</span><div class="chips wrap">';
-    for(var i=0;i<tagVocab.length;i++){
-      var on=hasTag(filters.tags,tagVocab[i]);
-      h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'" data-act="chip" data-dim="tags" data-val="'+esc(tagVocab[i])+'" data-multi="1">'+esc(tagVocab[i])+'</button>';
+    for(var i=0;i<tv.length;i++){
+      var on=hasTag(filters.tags,tv[i]);
+      h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'" data-act="chip" data-dim="tags" data-val="'+esc(tv[i])+'" data-multi="1">'+esc(tv[i])+'</button>';
     }
     return h+'</div></div>';
   }
@@ -723,10 +742,12 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return h+'</div></div>';
   }
   function pileTagRow(){
+    var tv=tagsInUse(openTasks(),pileFilters.tags);
+    if(!tv.length) return "";
     var h='<div class="dial tagsdial"><span class="clbl">Tags</span><div class="chips wrap">';
-    for(var i=0;i<tagVocab.length;i++){
-      var on=hasTag(pileFilters.tags,tagVocab[i]);
-      h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'" data-act="pchip" data-dim="tags" data-val="'+esc(tagVocab[i])+'">'+esc(tagVocab[i])+'</button>';
+    for(var i=0;i<tv.length;i++){
+      var on=hasTag(pileFilters.tags,tv[i]);
+      h+='<button class="chip'+(on?" on":"")+'" aria-pressed="'+on+'" data-act="pchip" data-dim="tags" data-val="'+esc(tv[i])+'">'+esc(tv[i])+'</button>';
     }
     return h+'</div></div>';
   }
@@ -794,7 +815,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         +pileChips("Time","time",TIMES)
         +pileChips("Context","context",CONTEXTS)
         +pileChips("When","when",WHENS)
-        +(tagVocab.length?pileTagRow():"")
+        +pileTagRow()
         +'<div class="pffoot">'+(active?'<button class="pfclear" data-act="pfilter-clear">Clear all</button>':'<span class="pfcount">Tap to filter the pile</span>')+'</div>'
         +'</div>';
     }
@@ -913,7 +934,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
             +chips("Energy","energy",filters.energy,true,LEVELS)
             +chips("Time","time",filters.time,true,TIMES)
             +chips("Context","context",filters.context,true,CONTEXTS)
-            +(tagVocab.length?tagFilterRow():"")
+            +tagFilterRow()
             +'<button class="btn showone" data-act="show-one"'+(m.length?"":" disabled")+'>'
             +(m.length?("Show me one — "+m.length+" match"):"Nothing matches that")
             +'</button>';
@@ -1550,7 +1571,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     else if(a==="chip"){
       var dim=el.getAttribute("data-dim"), val=el.getAttribute("data-val");
       if(el.getAttribute("data-multi")==="1"){
-        var arr=filters[dim], k=arr.indexOf(val);
+        var arr=filters[dim], k=listIndex(arr,val,dim);
         if(k>-1) arr.splice(k,1); else arr.push(val);
       } else {
         draft[dim]=val;
@@ -1559,7 +1580,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     }
     else if(a==="pchip"){
       var fdim=el.getAttribute("data-dim"), fval=el.getAttribute("data-val");
-      var farr=pileFilters[fdim], fk=farr.indexOf(fval);
+      var farr=pileFilters[fdim], fk=listIndex(farr,fval,fdim);
       if(fk>-1) farr.splice(fk,1); else farr.push(fval);
       render();
     }
