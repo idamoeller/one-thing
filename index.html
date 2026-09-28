@@ -270,6 +270,19 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   .bodywrap{padding:34px 32px 46px;}
   .stagein{max-width:720px;padding-left:32px;padding-right:32px;}
 }
+.sidenav{display:none;}
+/* Wide desktop: a fixed left sidebar replaces the Menu button. */
+@media (min-width:1024px){
+  .layout{padding-left:220px;}
+  .sidenav{display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;width:220px;padding:0 24px 20px;border-right:1px solid var(--hairline);background:var(--surface);overflow-y:auto;z-index:5;}
+  .sidebrand{height:54px;display:flex;align-items:center;flex:none;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;border-bottom:1px solid var(--hairline);margin-bottom:10px;}
+  .sidenav nav{display:flex;flex-direction:column;flex:1;}
+  .sidenav button{display:block;width:100%;text-align:left;font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:11px 0 11px 10px;border-left:2px solid transparent;}
+  .sidenav button:hover{color:var(--ink);}
+  .sidenav button.on{color:var(--ink);font-weight:600;border-left-color:var(--ink);}
+  .sidenav .navout{margin-top:auto;border-top:1px solid var(--hairline);padding-top:14px;}
+  .hdr .hmenu{display:none;}
+}
 </style>
 </head>
 <body>
@@ -789,14 +802,17 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     });
   }
 
-  function pileView(){
-    var all=openTasks(), nFuture=futureTasks().length;
-    // Must-do tasks float to the top; within each group, dragged (custom) order,
-    // with tasks not yet placed first in newest-first order (stable sort).
+  // Pile order: must-do tasks float to the top; within each group, dragged (custom)
+  // order, with tasks not yet placed first in newest-first order (stable sort).
+  function pileSort(list){
     var rank={};
     for(var ri=0;ri<pileOrder.length;ri++) rank[pileOrder[ri]]=ri;
     function rk(t){ var r=rank[String(t.id)]; return r===undefined?-1:r; }
-    all.sort(function(a,b){ return ((b.must?1:0)-(a.must?1:0)) || (rk(a)-rk(b)); });
+    return list.slice().sort(function(a,b){ return ((b.must?1:0)-(a.must?1:0)) || (rk(a)-rk(b)); });
+  }
+
+  function pileView(){
+    var all=pileSort(openTasks()), nFuture=futureTasks().length;
     pileShown=all.map(function(t){ return String(t.id); });   // full order, incl. hidden future tasks
     if(!showFuture) all=all.filter(function(t){ return !isFuture(t); });
     var total=all.length;
@@ -912,7 +928,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   }
 
   function chooseView(){
-    var o=nowTasks();
+    var o=pileSort(nowTasks());
     if(!o.length){ return '<h1 class="h1">Nothing left</h1>'; }
     var m=matching();
     var pc=o.filter(function(t){return t.context==="personal";}).length;
@@ -1250,9 +1266,17 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   }
 
   function menuHTML(){
-    var inboxN=inboxTasks().length;
     return '<div class="menuwrap"><div class="menuback" data-act="menu-close"></div><nav class="menu">'
-      +'<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
+      +navItemsHTML()
+      +'</nav></div>';
+  }
+  // Desktop-only left sidebar (CSS shows it on wide windows; hidden on phones).
+  function sideNavHTML(){
+    return '<aside class="sidenav"><div class="sidebrand">One Thing</div><nav>'+navItemsHTML()+'</nav></aside>';
+  }
+  function navItemsHTML(){
+    var inboxN=inboxTasks().length;
+    return '<button class="'+(screen==="collect"?"on":"")+'" data-act="nav" data-to="collect">Collect</button>'
       +'<button class="'+(screen==="plan"?"on":"")+'" data-act="nav" data-to="plan">Plan</button>'
       +'<button class="'+(screen==="inbox"?"on":"")+'" data-act="nav" data-to="inbox">Inbox'+(inboxN?(" ("+inboxN+")"):"")+'</button>'
       +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
@@ -1260,8 +1284,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       +'<button class="'+(screen==="future"?"on":"")+'" data-act="nav" data-to="future">Future</button>'
       +'<button class="'+(screen==="done"?"on":"")+'" data-act="nav" data-to="done">Completed</button>'
       +'<button class="'+(screen==="settings"?"on":"")+'" data-act="nav" data-to="settings">Settings</button>'
-      +'<button data-act="signout">Log out</button>'
-      +'</nav></div>';
+      +'<button class="navout" data-act="signout">Log out</button>';
   }
 
   function draw(){
@@ -1290,7 +1313,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     var notCollect=screen!=="collect";
     var inboxN=inboxTasks().length;
 
-    var h='<div class="shell"><header class="hdr">'
+    var h='<div class="layout">'+sideNavHTML()+'<div class="shell"><header class="hdr">'
       +(notCollect?'<button class="hbtn hback" data-act="hist-back" aria-label="Back">&larr;</button>':'')
       +(doneToday?('<button class="hbtn htally" data-act="nav" data-to="done">'+doneToday+' done today</button>'):'')
       +((inboxN && screen!=="inbox")?('<button class="hbtn hinbox" data-act="nav" data-to="inbox">📥 '+inboxN+'</button>'):'')
@@ -1300,7 +1323,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       +'</header><div class="bodywrap">';
     if(flash) h+='<div class="flash">'+esc(flash)+'</div>';
     h+=(screen==="collect"?collectView():screen==="plan"?planView():screen==="inbox"?inboxView():screen==="pile"?pileView():screen==="future"?futureView():screen==="done"?doneView():screen==="settings"?settingsView():chooseView());
-    h+='</div></div>';
+    h+='</div></div></div>';
     if(menuOpen) h+=menuHTML();
     app.innerHTML=h;
   }
