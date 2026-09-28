@@ -238,7 +238,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 /* plan / big 3 screen */
 .h2{font-family:var(--sans);font-weight:600;font-size:15px;letter-spacing:.04em;text-transform:uppercase;margin:28px 0 6px;}
 .plandate{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;}
-.draghandle{flex:none;align-self:flex-start;width:18px;margin-left:-4px;padding-top:1px;font-size:14px;line-height:1;letter-spacing:-3px;color:var(--muted);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;}
+.draghandle{flex:none;align-self:flex-start;width:18px;margin-left:2px;margin-right:-4px;padding-top:3px;text-align:center;font-size:14px;line-height:1;letter-spacing:-3px;color:var(--muted);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;}
 [data-draglist] .row{transition:transform .15s ease;}
 [data-draglist] .row.dragging{transition:none;position:relative;z-index:2;background:var(--surface);box-shadow:0 6px 18px rgba(16,19,20,.12);cursor:grabbing;}
 .bignum{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);flex:none;width:14px;align-self:flex-start;padding-top:2px;}
@@ -321,6 +321,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   // Plan / Big 3 (Full Focus style). Weekly = free-text outcomes; Daily = linked task ids.
   // Kept per ISO-week / per-day inside the settings blob — no schema change.
   var plans={weeks:{},days:{}};
+  var pileOrder=[];   // custom pile order (task ids), set by dragging; saved in settings
   var planPick=false, wkEdit=null, wkBuf="", wkNewBuf="";
 
   function esc(s){
@@ -578,13 +579,14 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           plans={ weeks:(d.plans.weeks && typeof d.plans.weeks==="object")?d.plans.weeks:{},
                   days:(d.plans.days && typeof d.plans.days==="object")?d.plans.days:{} };
         }
+        if(Array.isArray(d.pileOrder)) pileOrder=d.pileOrder.map(String);
       }
     }).catch(function(){});
   }
   function saveSettings(){
     if(!sb || !user) return;
     var payload={user_id:user.id,
-      defaults:{p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w,tags:tagVocab,plans:plans},
+      defaults:{p:defaults.p,u:defaults.u,e:defaults.e,t:defaults.t,c:defaults.c,w:defaults.w,tags:tagVocab,plans:plans,pileOrder:pileOrder},
       updated_at:new Date().toISOString()};
     sb.from("settings").upsert(payload).then(function(res){
       if(res.error){ flash="Couldn't save settings: "+errmsg(res.error); render(); }
@@ -788,9 +790,15 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   }
 
   function pileView(){
-    var all=showFuture?openTasks():nowTasks(), nFuture=futureTasks().length;
-    // Must-do tasks float to the top; stable sort keeps the newest-first order within each group.
-    all.sort(function(a,b){ return (b.must?1:0)-(a.must?1:0); });
+    var all=openTasks(), nFuture=futureTasks().length;
+    // Must-do tasks float to the top; within each group, dragged (custom) order,
+    // with tasks not yet placed first in newest-first order (stable sort).
+    var rank={};
+    for(var ri=0;ri<pileOrder.length;ri++) rank[pileOrder[ri]]=ri;
+    function rk(t){ var r=rank[String(t.id)]; return r===undefined?-1:r; }
+    all.sort(function(a,b){ return ((b.must?1:0)-(a.must?1:0)) || (rk(a)-rk(b)); });
+    pileShown=all.map(function(t){ return String(t.id); });   // full order, incl. hidden future tasks
+    if(!showFuture) all=all.filter(function(t){ return !isFuture(t); });
     var total=all.length;
     var h='<h1 class="h1">The pile'+(total?(" — "+total+" "+(total===1?"task":"tasks")):"")+'</h1>';
     var futureBox=nFuture?('<label class="futurebox"><input type="checkbox" data-act="toggle-show-future"'+(showFuture?" checked":"")+'>'
@@ -829,12 +837,13 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       var oc=o.filter(function(t){ return !isFuture(t); }).length;
       if(oc) h+='<button class="btn pfchoose" data-act="pfilter-choose">Choose one of these '+oc+'</button>';
     }
-    h+='<div class="list">';
+    var pDrag=o.length>1 && titleEdit==null;
+    h+='<div class="list"'+(pDrag?' data-draglist="pile"':'')+'>';
     for(var i=0;i<o.length;i++){
       var t=o[i];
       var editingTitle=String(titleEdit)===String(t.id), fut=isFuture(t);
       // Future rows aren't tap-to-start: move one to "now" before working on it.
-      h+='<div class="row'+(fut?" futurerow":"")+'"'+(fut?'':' data-act="pick" data-id="'+t.id+'" role="button" tabindex="0"')+'>'
+      h+='<div class="row'+(fut?" futurerow":"")+'"'+(pDrag?' data-dragid="'+esc(String(t.id))+'"':'')+(fut?'':' data-act="pick" data-id="'+t.id+'" role="button" tabindex="0"')+'>'
         +'<div class="rowmark">'
         +'<button class="rowstar'+(t.must?" on":"")+'" data-act="toggle-must-row" data-id="'+t.id+'" aria-pressed="'+(t.must?"true":"false")+'" aria-label="Must do">'+(t.must?"★":"☆")+'</button>'
         +'<button class="rowd3'+(inDayBig3(t.id)?" on":"")+'" data-act="toggle-d3-row" data-id="'+t.id+'" aria-pressed="'+(inDayBig3(t.id)?"true":"false")+'" aria-label="Add to Daily Big 3">D3</button>'
@@ -847,7 +856,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         +rowTagShelf(t)+metricPills(t,false)+'</div>'
         +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
         +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button>'
-        +'<button class="rowcheck" data-act="complete-row" data-id="'+t.id+'" aria-label="Mark complete">'+CHECK+'</button></div>';
+        +'<button class="rowcheck" data-act="complete-row" data-id="'+t.id+'" aria-label="Mark complete">'+CHECK+'</button>'+(pDrag?DRAG_HANDLE:'')+'</div>';
     }
     h+='</div>';
     return h;
@@ -1015,7 +1024,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 
   // ---- Drag to reorder the Big 3 lists (pointer events: mouse + touch) ----
   var DRAG_HANDLE='<span class="draghandle" data-act="noop" aria-hidden="true">&#8942;&#8942;</span>';
-  var drag=null, dragSuppressClick=0;
+  var drag=null, dragSuppressClick=0, pileShown=[];
   document.addEventListener("pointerdown",function(ev){
     var hd=ev.target.closest && ev.target.closest(".draghandle");
     if(!hd || (ev.button!==undefined && ev.button!==0)) return;
@@ -1053,7 +1062,17 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     if(ev.type==="pointercancel" || d.to===d.from) return;
     var ids=d.rows.map(function(r){ return r.getAttribute("data-dragid"); });
     var moved=ids.splice(d.from,1)[0]; ids.splice(d.to,0,moved);
-    if(d.list.getAttribute("data-draglist")==="wk"){
+    var kind=d.list.getAttribute("data-draglist");
+    if(kind==="pile"){
+      // The visible rows may be a subset (filters, hidden future tasks), so place
+      // the moved task just before its new visible successor in the full order.
+      var full=pileShown.filter(function(x){ return x!==moved; });
+      var next=ids[d.to+1], prev=ids[d.to-1];
+      var at=next!=null?full.indexOf(next):full.indexOf(prev)+1;
+      full.splice(at<0?full.length:at,0,moved);
+      pileOrder=full;
+      saveSettings();
+    } else if(kind==="wk"){
       var wk=weekBig3();
       setWeekBig3(ids.map(function(ix){ return wk[+ix]; }));
     } else {
@@ -1085,10 +1104,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
             +'<div class="rowtxt"><div class="titleedit"><input class="titlein" id="wkin" type="text" value="'+esc(wkBuf)+'" spellcheck="true" aria-label="Weekly outcome">'
             +'<button class="tsmall" data-act="wk-save">Save</button><button class="tsmall" data-act="wk-cancel">Cancel</button></div></div></div>';
         } else {
-          h+='<div class="row"'+(wkDrag?' data-dragid="'+i+'"':'')+'>'+(wkDrag?DRAG_HANDLE:'')+'<span class="bignum">'+(i+1)+'</span>'
+          h+='<div class="row"'+(wkDrag?' data-dragid="'+i+'"':'')+'><span class="bignum">'+(i+1)+'</span>'
             +'<div class="rowtxt"><div class="rowtitle">'+esc(wk[i])+'</div></div>'
             +'<button class="rowedit" data-act="wk-edit" data-idx="'+i+'" aria-label="Edit outcome">'+PENCIL+'</button>'
-            +'<button class="rowx" data-act="wk-remove" data-idx="'+i+'" aria-label="Remove outcome">&times;</button></div>';
+            +'<button class="rowx" data-act="wk-remove" data-idx="'+i+'" aria-label="Remove outcome">&times;</button>'+(wkDrag?DRAG_HANDLE:'')+'</div>';
         }
       }
       h+='</div>';
@@ -1116,10 +1135,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       h+='<div class="list"'+(dDrag?' data-draglist="d3"':'')+'>';
       for(var k=0;k<items.length;k++){
         var it=items[k], dn=!!it.done;
-        h+='<div class="row"'+(dDrag?' data-dragid="'+esc(String(it.id))+'"':'')+(dn?'':' data-act="pick" data-id="'+it.id+'" role="button" tabindex="0"')+'>'+(dDrag?DRAG_HANDLE:'')
+        h+='<div class="row"'+(dDrag?' data-dragid="'+esc(String(it.id))+'"':'')+(dn?'':' data-act="pick" data-id="'+it.id+'" role="button" tabindex="0"')+'>'
           +'<button class="d3check'+(dn?" on":"")+'" data-act="d3-done" data-id="'+it.id+'" aria-pressed="'+(dn?"true":"false")+'" aria-label="Complete">'+(dn?"✓":"")+'</button>'
           +'<div class="rowtxt"><div class="rowtitle'+(dn?" done":"")+'">'+esc(it.text)+'</div>'+tagsHTML(it)+'</div>'
-          +'<button class="rowx" data-act="d3-remove" data-id="'+it.id+'" aria-label="Remove from Big 3">&times;</button></div>';
+          +'<button class="rowx" data-act="d3-remove" data-id="'+it.id+'" aria-label="Remove from Big 3">&times;</button>'+(dDrag?DRAG_HANDLE:'')+'</div>';
       }
       h+='</div>';
     }
