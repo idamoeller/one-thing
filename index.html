@@ -245,6 +245,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .planadd{margin-top:12px;}
 .carry{margin:4px 0 14px;}
 /* pile view filter */
+.futurebox{display:flex;align-items:center;gap:8px;margin-top:12px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;}
+.futurebox input{accent-color:var(--ink);width:14px;height:14px;margin:0;cursor:pointer;}
+.futurerow .rowtitle{opacity:.55;}
 .pilefilterrow{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;}
 .pilefilterbtn{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);border:1px solid var(--ink);border-radius:2px;padding:9px 14px;background:var(--white);cursor:pointer;}
 .pilefilterbtn.on{background:var(--ink);color:var(--white);}
@@ -308,6 +311,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   // Pile view filter (independent of the Choose "Zero in" filters above). Multi-select
   // per dimension + tags, plus starred/D3 flags. Purely a view filter; never picks.
   var pileFilterOpen=false;
+  var showFuture=false;   // pile checkbox: future tasks hidden by default
   var pileFilters={priority:[],urgency:[],energy:[],time:[],context:[],when:[],tags:[],must:false,d3:false};
   var timer={mins:5,left:300,run:false,iv:null,editing:false,buf:"",endAt:null};
   var timerSound="bell";
@@ -323,6 +327,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   }
   function uid(){ return Math.random().toString(36).slice(2,10); }
   function openTasks(){ return tasks.filter(function(t){ return !t.done && !t.inbox; }); }
+  // "Future" tasks (When = future) are placeholders for someday: they live on
+  // their own page and are never drawn by any Choose option.
+  function isFuture(t){ return t.horizon==="future"; }
+  function nowTasks(){ return openTasks().filter(function(t){ return !isFuture(t); }); }
+  function futureTasks(){ return openTasks().filter(isFuture); }
   function inboxTasks(){ return tasks.filter(function(t){ return !t.done && t.inbox; }); }
   function tof(t){ return t.time || "med"; }
   function ctxOf(t){ return t.context || "work"; }
@@ -610,11 +619,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return false;
   }
   function matching(){
-    return openTasks().filter(function(t){
+    return nowTasks().filter(function(t){
       return inF(filters.priority,t.priority) && inF(filters.urgency,t.urgency)
           && inF(filters.energy,t.energy) && inF(filters.time,t.time)
-          && inF(filters.context,t.context) && inF(filters.when,t.horizon)
-          && tagOK(t);
+          && inF(filters.context,t.context) && tagOK(t);
     });
   }
   // Uniformly random pick from the pool (no priority weighting).
@@ -625,12 +633,12 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return pool[Math.floor(Math.random()*pool.length)];
   }
   // The candidate pool for the current pick "bucket": Zero-in matches, the
-  // Dealer's-choice context, or (as a fallback) all open tasks.
+  // Dealer's-choice context, or (as a fallback) all open tasks. Never future tasks.
   function bucketPool(){
     if(method==="filter") return matching();
-    if(method==="pilefilter") return pileMatching(openTasks());
-    if(method==="deal") return openTasks().filter(function(t){ return t.context===dealCtx; });
-    return openTasks();
+    if(method==="pilefilter") return pileMatching(nowTasks());
+    if(method==="deal") return nowTasks().filter(function(t){ return t.context===dealCtx; });
+    return nowTasks();
   }
   // Buckets that yield a random "next" task. A specific pick has no bucket, so
   // finishing/skipping one sends you back to the task list to choose again.
@@ -699,7 +707,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       +'<button class="btn addit" data-act="add"'+(canAdd()?"":" disabled")+'>Add it</button>'
       +'<div class="pilebtns">'
       +'<button class="btn ghost" data-act="go-pile"'+(o.length?"":" disabled")+'>View pile</button>'
-      +'<button class="btn ghost" data-act="go-choose"'+(o.length?"":" disabled")+'>Choose task</button>'
+      +'<button class="btn ghost" data-act="go-choose"'+(nowTasks().length?"":" disabled")+'>Choose task</button>'
       +'</div>';
     return h;
   }
@@ -755,17 +763,19 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   }
 
   function pileView(){
-    var all=openTasks();
+    var all=showFuture?openTasks():nowTasks(), nFuture=futureTasks().length;
     // Must-do tasks float to the top; stable sort keeps the newest-first order within each group.
     all.sort(function(a,b){ return (b.must?1:0)-(a.must?1:0); });
     var total=all.length;
     var h='<h1 class="h1">The pile'+(total?(" — "+total+" "+(total===1?"task":"tasks")):"")+'</h1>';
+    var futureBox=nFuture?('<label class="futurebox"><input type="checkbox" data-act="toggle-show-future"'+(showFuture?" checked":"")+'>'
+      +'Show future tasks ('+nFuture+')</label>'):'';
     if(!total){
-      h+='<button class="btn ghost pilecta" data-act="go-choose" disabled>Choose task</button>'
-        +'<p class="emptyline">Nothing here yet. Add something first.</p>';
+      h+='<button class="btn ghost pilecta" data-act="go-choose" disabled>Choose task</button>'+futureBox
+        +'<p class="emptyline">'+(nFuture?"Nothing for now. Only future tasks left.":"Nothing here yet. Add something first.")+'</p>';
       return h;
     }
-    h+='<button class="btn ghost pilecta" data-act="go-choose">Choose task</button>';
+    h+='<button class="btn ghost pilecta" data-act="go-choose"'+(nowTasks().length?"":" disabled")+'>Choose task</button>'+futureBox;
     var active=pileFilterActive();
     var o=active?pileMatching(all):all;
     h+='<div class="pilefilterrow"><button class="pilefilterbtn'+(active?" on":"")+'" data-act="pfilter-toggle" aria-expanded="'+pileFilterOpen+'">'
@@ -791,13 +801,15 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     if(active && !o.length){
       h+='<p class="emptyline">No tasks match these filters.</p>';
     } else if(active){
-      h+='<button class="btn pfchoose" data-act="pfilter-choose">Choose one of these '+o.length+'</button>';
+      var oc=o.filter(function(t){ return !isFuture(t); }).length;
+      if(oc) h+='<button class="btn pfchoose" data-act="pfilter-choose">Choose one of these '+oc+'</button>';
     }
     h+='<div class="list">';
     for(var i=0;i<o.length;i++){
       var t=o[i];
-      var editingTitle=String(titleEdit)===String(t.id);
-      h+='<div class="row" data-act="pick" data-id="'+t.id+'" role="button" tabindex="0">'
+      var editingTitle=String(titleEdit)===String(t.id), fut=isFuture(t);
+      // Future rows aren't tap-to-start: move one to "now" before working on it.
+      h+='<div class="row'+(fut?" futurerow":"")+'"'+(fut?'':' data-act="pick" data-id="'+t.id+'" role="button" tabindex="0"')+'>'
         +'<div class="rowmark">'
         +'<button class="rowstar'+(t.must?" on":"")+'" data-act="toggle-must-row" data-id="'+t.id+'" aria-pressed="'+(t.must?"true":"false")+'" aria-label="Must do">'+(t.must?"★":"☆")+'</button>'
         +'<button class="rowd3'+(inDayBig3(t.id)?" on":"")+'" data-act="toggle-d3-row" data-id="'+t.id+'" aria-pressed="'+(inDayBig3(t.id)?"true":"false")+'" aria-label="Add to Daily Big 3">D3</button>'
@@ -811,6 +823,30 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
         +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button>'
         +'<button class="rowcheck" data-act="complete-row" data-id="'+t.id+'" aria-label="Mark complete">'+CHECK+'</button></div>';
+    }
+    h+='</div>';
+    return h;
+  }
+
+  function futureView(){
+    var o=futureTasks();
+    var h='<h1 class="h1">Future'+(o.length?(" — "+o.length+" "+(o.length===1?"task":"tasks")):"")+'</h1>'
+      +'<p class="setnote">Someday placeholders. Never dealt by Choose. Move one to now when you&#39;re ready to work on it.</p>';
+    if(!o.length){ h+='<p class="emptyline">No future tasks. Set When to future to park one here.</p>'; return h; }
+    h+='<div class="list">';
+    for(var i=0;i<o.length;i++){
+      var t=o[i];
+      var editingTitle=String(titleEdit)===String(t.id);
+      h+='<div class="row">'
+        +'<div class="rowtxt">'
+        +(editingTitle
+          ? '<div class="titleedit" data-act="noop"><input class="titlein" id="titlein" type="text" value="'+esc(titleBuf)+'" spellcheck="true" aria-label="Task">'
+            +'<button class="tsmall" data-act="title-save">Save</button><button class="tsmall" data-act="title-cancel">Cancel</button></div>'
+          : '<div class="rowtitle">'+esc(t.text)+'</div>')
+        +rowTagShelf(t)+metricPills(t,false)+'</div>'
+        +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
+        +'<button class="keepbtn" data-act="future-now" data-id="'+t.id+'">Move to now</button>'
+        +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button></div>';
     }
     h+='</div>';
     return h;
@@ -842,7 +878,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   }
 
   function chooseView(){
-    var o=openTasks();
+    var o=nowTasks();
     if(!o.length){ return '<h1 class="h1">Nothing left</h1>'; }
     var m=matching();
     var pc=o.filter(function(t){return t.context==="personal";}).length;
@@ -876,7 +912,6 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
             +chips("Urgency","urgency",filters.urgency,true,LEVELS)
             +chips("Energy","energy",filters.energy,true,LEVELS)
             +chips("Time","time",filters.time,true,TIMES)
-            +chips("When","when",filters.when,true,WHENS)
             +chips("Context","context",filters.context,true,CONTEXTS)
             +(tagVocab.length?tagFilterRow():"")
             +'<button class="btn showone" data-act="show-one"'+(m.length?"":" disabled")+'>'
@@ -1003,7 +1038,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 
     if(items.length<3){
       if(planPick){
-        var avail=openTasks().filter(function(t){ return !inDayBig3(t.id); });
+        var avail=nowTasks().filter(function(t){ return !inDayBig3(t.id); });
         h+='<div class="scroll planadd">';
         if(!avail.length){ h+='<p class="emptyline">No other open tasks. Add some in Collect first.</p>'; }
         for(var p=0;p<avail.length;p++){
@@ -1115,6 +1150,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       +'<button class="'+(screen==="inbox"?"on":"")+'" data-act="nav" data-to="inbox">Inbox'+(inboxN?(" ("+inboxN+")"):"")+'</button>'
       +'<button class="'+(screen==="choose"?"on":"")+'" data-act="nav" data-to="choose">Choose</button>'
       +'<button class="'+(screen==="pile"?"on":"")+'" data-act="nav" data-to="pile">All tasks</button>'
+      +'<button class="'+(screen==="future"?"on":"")+'" data-act="nav" data-to="future">Future</button>'
       +'<button class="'+(screen==="done"?"on":"")+'" data-act="nav" data-to="done">Completed</button>'
       +'<button class="'+(screen==="settings"?"on":"")+'" data-act="nav" data-to="settings">Settings</button>'
       +'<button data-act="signout">Log out</button>'
@@ -1156,7 +1192,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       +'<button class="hbtn hmenu" data-act="menu-toggle" aria-expanded="'+menuOpen+'">Menu</button>'
       +'</header><div class="bodywrap">';
     if(flash) h+='<div class="flash">'+esc(flash)+'</div>';
-    h+=(screen==="collect"?collectView():screen==="plan"?planView():screen==="inbox"?inboxView():screen==="pile"?pileView():screen==="done"?doneView():screen==="settings"?settingsView():chooseView());
+    h+=(screen==="collect"?collectView():screen==="plan"?planView():screen==="inbox"?inboxView():screen==="pile"?pileView():screen==="future"?futureView():screen==="done"?doneView():screen==="settings"?settingsView():chooseView());
     h+='</div></div>';
     if(menuOpen) h+=menuHTML();
     app.innerHTML=h;
@@ -1538,7 +1574,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       render();
     }
     else if(a==="pfilter-choose"){
-      var ppool=pileMatching(openTasks());
+      var ppool=pileMatching(nowTasks());
       var pchosen=pickOne(ppool,null);
       if(!pchosen) return;
       method="pilefilter"; resetTimer(); setScreen("focus", pchosen.id);
@@ -1574,7 +1610,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
           var b1=document.querySelector('[data-act="go-pile"]');
           var b2=document.querySelector('[data-act="go-choose"]');
           if(b1) b1.removeAttribute("disabled");
-          if(b2) b2.removeAttribute("disabled");
+          if(b2 && !isFuture(res.data)) b2.removeAttribute("disabled");
         } else { render(); }
       });
     }
@@ -1609,6 +1645,16 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         });
       }
     }
+    else if(a==="future-now"){
+      var fid=el.getAttribute("data-id"), ft=findTask(fid);
+      if(ft && sb){
+        ft.horizon="now"; render();
+        sb.from("tasks").update({horizon:"now"}).eq("id",fid).then(function(res){
+          if(res.error){ ft.horizon="future"; flash="Couldn't move: "+res.error.message; render(); }
+        });
+      }
+    }
+    else if(a==="toggle-show-future"){ showFuture=!showFuture; render(); }
     else if(a==="toggle-must"){ draft.must=!draft.must; render(); }
     else if(a==="toggle-must-row"){
       var mid=el.getAttribute("data-id"), mt=findTask(mid);
@@ -1773,7 +1819,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     }
     else if(a==="deal-ctx"){
       var ctx=el.getAttribute("data-ctx");
-      var pool=openTasks().filter(function(t){ return t.context===ctx; });
+      var pool=nowTasks().filter(function(t){ return t.context===ctx; });
       var td=pickOne(pool,null);
       if(!td) return;
       method="deal"; dealCtx=ctx; resetTimer(); setScreen("focus", td.id);
