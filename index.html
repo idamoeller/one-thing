@@ -251,6 +251,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
 .futurebox{display:flex;align-items:center;gap:8px;margin-top:12px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;}
 .futurebox input{accent-color:var(--ink);width:14px;height:14px;margin:0;cursor:pointer;}
 .futurerow .rowtitle{opacity:.55;}
+.donedate{margin-top:12px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
 .pilefilterrow{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;}
 .pilefilterbtn{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);border:1px solid var(--ink);border-radius:2px;padding:9px 14px;background:var(--white);cursor:pointer;}
 .pilefilterbtn.on{background:var(--ink);color:var(--white);}
@@ -994,7 +995,10 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     h+='<div class="list">';
     for(var i=0;i<done.length;i++){
       var t=done[i];
-      h+='<div class="row"><div class="rowtxt"><div class="rowtitle mid">'+esc(t.text)+'</div>'+tagsHTML(t)+metricPills(t,true)+'</div></div>';
+      var dms=doneAtMs(t);
+      h+='<div class="row"><div class="rowtxt"><div class="rowtitle mid">'+esc(t.text)+'</div>'+tagsHTML(t)+metricPills(t,true)
+        +(dms?'<div class="donedate">Completed: '+esc(new Date(dms).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"}))+'</div>':'')
+        +'</div></div>';
     }
     h+='</div>';
     return h;
