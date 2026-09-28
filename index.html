@@ -811,6 +811,27 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     return list.slice().sort(function(a,b){ return ((b.must?1:0)-(a.must?1:0)) || (rk(a)-rk(b)); });
   }
 
+  // One task row, as on the pile (also used by Choose > Specific task).
+  function pileRowHTML(t,drag){
+    var editingTitle=String(titleEdit)===String(t.id), fut=isFuture(t), h='';
+    // Future rows aren't tap-to-start: move one to "now" before working on it.
+    h+='<div class="row'+(fut?" futurerow":"")+'"'+(drag?' data-dragid="'+esc(String(t.id))+'"':'')+(fut?'':' data-act="pick" data-id="'+t.id+'" role="button" tabindex="0"')+'>'
+      +'<div class="rowmark">'
+      +'<button class="rowstar'+(t.must?" on":"")+'" data-act="toggle-must-row" data-id="'+t.id+'" aria-pressed="'+(t.must?"true":"false")+'" aria-label="Must do">'+(t.must?"★":"☆")+'</button>'
+      +'<button class="rowd3'+(inDayBig3(t.id)?" on":"")+'" data-act="toggle-d3-row" data-id="'+t.id+'" aria-pressed="'+(inDayBig3(t.id)?"true":"false")+'" aria-label="Add to Daily Big 3">D3</button>'
+      +'</div>'
+      +'<div class="rowtxt">'
+      +(editingTitle
+        ? '<div class="titleedit" data-act="noop"><input class="titlein" id="titlein" type="text" value="'+esc(titleBuf)+'" spellcheck="true" aria-label="Task">'
+          +'<button class="tsmall" data-act="title-save">Save</button><button class="tsmall" data-act="title-cancel">Cancel</button></div>'
+        : '<div class="rowtitle">'+esc(t.text)+'</div>')
+      +rowTagShelf(t)+metricPills(t,false)+'</div>'
+      +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
+      +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button>'
+      +'<button class="rowcheck" data-act="complete-row" data-id="'+t.id+'" aria-label="Mark complete">'+CHECK+'</button>'+(drag?DRAG_HANDLE:'')+'</div>';
+    return h;
+  }
+
   function pileView(){
     var all=pileSort(openTasks()), nFuture=futureTasks().length;
     pileShown=all.map(function(t){ return String(t.id); });   // full order, incl. hidden future tasks
@@ -855,25 +876,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     }
     var pDrag=o.length>1 && titleEdit==null;
     h+='<div class="list"'+(pDrag?' data-draglist="pile"':'')+'>';
-    for(var i=0;i<o.length;i++){
-      var t=o[i];
-      var editingTitle=String(titleEdit)===String(t.id), fut=isFuture(t);
-      // Future rows aren't tap-to-start: move one to "now" before working on it.
-      h+='<div class="row'+(fut?" futurerow":"")+'"'+(pDrag?' data-dragid="'+esc(String(t.id))+'"':'')+(fut?'':' data-act="pick" data-id="'+t.id+'" role="button" tabindex="0"')+'>'
-        +'<div class="rowmark">'
-        +'<button class="rowstar'+(t.must?" on":"")+'" data-act="toggle-must-row" data-id="'+t.id+'" aria-pressed="'+(t.must?"true":"false")+'" aria-label="Must do">'+(t.must?"★":"☆")+'</button>'
-        +'<button class="rowd3'+(inDayBig3(t.id)?" on":"")+'" data-act="toggle-d3-row" data-id="'+t.id+'" aria-pressed="'+(inDayBig3(t.id)?"true":"false")+'" aria-label="Add to Daily Big 3">D3</button>'
-        +'</div>'
-        +'<div class="rowtxt">'
-        +(editingTitle
-          ? '<div class="titleedit" data-act="noop"><input class="titlein" id="titlein" type="text" value="'+esc(titleBuf)+'" spellcheck="true" aria-label="Task">'
-            +'<button class="tsmall" data-act="title-save">Save</button><button class="tsmall" data-act="title-cancel">Cancel</button></div>'
-          : '<div class="rowtitle">'+esc(t.text)+'</div>')
-        +rowTagShelf(t)+metricPills(t,false)+'</div>'
-        +'<button class="rowedit" data-act="title-edit" data-id="'+t.id+'" aria-label="Edit task">'+PENCIL+'</button>'
-        +'<button class="rowx" data-act="del" data-id="'+t.id+'" aria-label="Remove">&times;</button>'
-        +'<button class="rowcheck" data-act="complete-row" data-id="'+t.id+'" aria-label="Mark complete">'+CHECK+'</button>'+(pDrag?DRAG_HANDLE:'')+'</div>';
-    }
+    for(var i=0;i<o.length;i++){ h+=pileRowHTML(o[i],pDrag); }
     h+='</div>';
     return h;
   }
@@ -950,12 +953,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
             +'<button class="btn ghost" data-act="deal-ctx" data-ctx="work"'+(wc?"":" disabled")+'>Work</button>'
             +'</div>';
         } else if(s[0]==="pick"){
-          h+='<div class="scroll">';
-          for(var j=0;j<o.length;j++){
-            h+='<div class="pickrow" data-act="pick" data-id="'+o[j].id+'" role="button" tabindex="0">'
-              +'<div class="rowtxt"><div class="rowtitle">'+esc(o[j].text)+'</div>'+tagsHTML(o[j])+metricPills(o[j],true)+'</div>'
-              +'<button class="rowx" data-act="del" data-id="'+o[j].id+'" aria-label="Remove">&times;</button></div>';
-          }
+          // Same rows as the pile (star, D3, edit, remove, complete, drag), in pile order.
+          pileShown=pileSort(openTasks()).map(function(t){ return String(t.id); });
+          var cDrag=o.length>1 && titleEdit==null;
+          h+='<div class="list picklist"'+(cDrag?' data-draglist="pile"':'')+'>';
+          for(var j=0;j<o.length;j++){ h+=pileRowHTML(o[j],cDrag); }
           h+='</div>';
         } else {
           var nd3=nowTasks().filter(function(t){ return inDayBig3(t.id); }).length;
