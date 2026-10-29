@@ -1691,7 +1691,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
         var ctx=res.error && res.error.context;
         var body=(ctx && ctx.json) ? ctx.json().catch(function(){ return null; }) : Promise.resolve(res.data);
         return body.then(function(b){
-          return {ok:false, why:(b && b.error) || (res.error && res.error.message) || "unknown error"};
+          var why=(b && (b.error || b.message || b.msg)) || (res.error && res.error.message) || "unknown error";
+          if(typeof why==="object") why=why.message || JSON.stringify(why);
+          return {ok:false, why:String(why)};
         });
       }).then(function(r){
         exportBusy=false;

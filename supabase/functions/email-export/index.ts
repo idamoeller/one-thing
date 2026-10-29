@@ -47,6 +47,17 @@ function toCSV(rows: Record<string, unknown>[]): string {
   return "﻿" + lines.join("\r\n");
 }
 
+// Supabase query errors are plain objects ({message, code, details}), not Error instances.
+function errText(e: unknown): string {
+  if (e && typeof e === "object") {
+    const o = e as Record<string, unknown>;
+    const parts = [o.message, o.code && `code ${o.code}`, o.details, o.hint].filter(Boolean);
+    if (parts.length) return parts.join(" — ");
+    try { return JSON.stringify(e); } catch { /* fall through */ }
+  }
+  return String(e);
+}
+
 // deno-lint-ignore no-explicit-any
 async function findUserByEmail(admin: any, email: string) {
   const want = String(email || "").trim().toLowerCase();
@@ -68,22 +79,27 @@ Deno.serve(async (req) => {
     const cronSecret = Deno.env.get("CRON_SECRET");
 
     let user;
+    let db = admin;
     if (cronSecret && req.headers.get("x-cron-secret") === cronSecret) {
       const body = await req.json().catch(() => ({}));
       user = await findUserByEmail(admin, body.email);
       if (!user) return reply(404, { error: "No user with that email" });
     } else {
-      const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-      const { data, error } = await admin.auth.getUser(token);
+      const auth = req.headers.get("Authorization") || "";
+      const { data, error } = await admin.auth.getUser(auth.replace(/^Bearer\s+/i, ""));
       if (error || !data.user) return reply(401, { error: "Not signed in" });
       user = data.user;
+      // On demand, read as the signed-in user so the app's normal RLS rules apply.
+      db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: auth } },
+      });
     }
     if (!user.email) return reply(400, { error: "User has no email address" });
 
-    // The service-role client bypasses RLS, so every query must filter on user_id.
+    // The cron path uses the service-role client, which bypasses RLS, so every query filters on user_id.
     const [tq, sq] = await Promise.all([
-      admin.from("tasks").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-      admin.from("settings").select("*").eq("user_id", user.id).maybeSingle(),
+      db.from("tasks").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      db.from("settings").select("*").eq("user_id", user.id).maybeSingle(),
     ]);
     if (tq.error) throw tq.error;
     if (sq.error) throw sq.error;
@@ -134,6 +150,6 @@ Deno.serve(async (req) => {
     return reply(200, { ok: true, sent_to: user.email, tasks: tasks.length });
   } catch (e) {
     console.error(e);
-    return reply(500, { error: e instanceof Error ? e.message : String(e) });
+    return reply(500, { error: errText(e) });
   }
 });
