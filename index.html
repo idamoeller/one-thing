@@ -312,6 +312,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
   var ARC_C=622.04; // 2π·99
 
   var tasks=[];
+  var exportBusy=false;
   var screen="collect", activeId=null, method="deal", dealCtx=null, openSec="", flash="", chooseTitle=rollChooseTitle();
   var booting=true;
   var user=null, authedId, authMode="signin", authEmail="", authPass="", authMsg="", authBusy=false;
@@ -1290,6 +1291,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
       +'<button class="'+(screen==="future"?"on":"")+'" data-act="nav" data-to="future">Future</button>'
       +'<button class="'+(screen==="done"?"on":"")+'" data-act="nav" data-to="done">Completed</button>'
       +'<button class="'+(screen==="settings"?"on":"")+'" data-act="nav" data-to="settings">Settings</button>'
+      +'<button data-act="email-export"'+(exportBusy?' disabled':'')+'>'+(exportBusy?'Sending export…':'Email my export')+'</button>'
       +'<button class="navout" data-act="signout">Log out</button>';
   }
 
@@ -1678,6 +1680,24 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus
     else if(a==="signout"){
       menuOpen=false;
       if(sb) sb.auth.signOut();
+    }
+    else if(a==="email-export"){
+      // Emails a CSV + JSON export of everything to the signed-in address (Edge Function email-export).
+      if(!sb || exportBusy) return;
+      exportBusy=true; menuOpen=false; flash=""; render();
+      sb.functions.invoke("email-export").then(function(res){
+        if(!res.error && res.data && res.data.ok) return {ok:true, to:res.data.sent_to};
+        // On a non-2xx reply supabase-js only says "non-2xx"; the function's own message is in the body.
+        var ctx=res.error && res.error.context;
+        var body=(ctx && ctx.json) ? ctx.json().catch(function(){ return null; }) : Promise.resolve(res.data);
+        return body.then(function(b){
+          return {ok:false, why:(b && b.error) || (res.error && res.error.message) || "unknown error"};
+        });
+      }).then(function(r){
+        exportBusy=false;
+        flash=r.ok ? ("Export sent to "+r.to+".") : ("Couldn't send export: "+r.why);
+        render();
+      });
     }
     else if(a==="menu-toggle"){ menuOpen=!menuOpen; render(); }
     else if(a==="menu-close"){ menuOpen=false; render(); }
