@@ -7,8 +7,10 @@
 //
 // Secrets (Dashboard → Edge Functions → Secrets): RESEND_API_KEY, CRON_SECRET.
 // Optional: EXPORT_FROM (defaults to Resend's shared test sender, which only delivers
-// to the Resend account owner's address). SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are
-// provided automatically.
+// to the Resend account owner's address). EXPORT_TO redirects a login's exports to
+// another address, as "login@x.com=recipient@y.com" pairs separated by commas; logins
+// not listed get their export at their own address. SUPABASE_URL / keys are provided
+// automatically.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
@@ -56,6 +58,14 @@ function errText(e: unknown): string {
     try { return JSON.stringify(e); } catch { /* fall through */ }
   }
   return String(e);
+}
+
+function recipientFor(login: string): string {
+  for (const pair of (Deno.env.get("EXPORT_TO") || "").split(",")) {
+    const [from, to] = pair.split("=").map((s) => s.trim().toLowerCase());
+    if (from && to && from === login.toLowerCase()) return to;
+  }
+  return login;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -106,6 +116,7 @@ Deno.serve(async (req) => {
     const tasks = tq.data || [];
     const settings = sq.data ? sq.data.defaults : null;
 
+    const to = recipientFor(user.email);
     const now = new Date();
     const stamp = now.toISOString().slice(0, 10);
     const json = JSON.stringify({
@@ -132,7 +143,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         from: Deno.env.get("EXPORT_FROM") || "One Thing <onboarding@resend.dev>",
-        to: [user.email],
+        to: [to],
         subject: `One Thing export — ${stamp}`,
         html:
           `<p>Your One Thing export from ${now.toUTCString()}.</p>` +
@@ -147,7 +158,7 @@ Deno.serve(async (req) => {
     });
     if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
 
-    return reply(200, { ok: true, sent_to: user.email, tasks: tasks.length });
+    return reply(200, { ok: true, sent_to: to, tasks: tasks.length });
   } catch (e) {
     console.error(e);
     return reply(500, { error: errText(e) });
