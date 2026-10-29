@@ -6,7 +6,8 @@
 //   - Daily from pg_cron: header `x-cron-secret: <CRON_SECRET>` and body {"email": "..."}.
 //
 // Secrets (Dashboard → Edge Functions → Secrets): RESEND_API_KEY, CRON_SECRET.
-// Optional: EXPORT_FROM (defaults to Resend's shared test sender, which only delivers
+// Optional: EXPORT_TZ (IANA zone for dates in the email, default America/New_York).
+// EXPORT_FROM (defaults to Resend's shared test sender, which only delivers
 // to the Resend account owner's address). EXPORT_TO redirects a login's exports to
 // another address, as "login@x.com=recipient@y.com" pairs separated by commas; logins
 // not listed get their export at their own address. SUPABASE_URL / keys are provided
@@ -118,7 +119,13 @@ Deno.serve(async (req) => {
 
     const to = recipientFor(user.email);
     const now = new Date();
-    const stamp = now.toISOString().slice(0, 10);
+    // Dates in the email follow EXPORT_TZ (default US Eastern), not UTC.
+    const tz = Deno.env.get("EXPORT_TZ") || "America/New_York";
+    const stamp = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now); // YYYY-MM-DD
+    const when = now.toLocaleString("en-US", {
+      timeZone: tz, weekday: "long", month: "long", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit", timeZoneName: "short",
+    });
     const json = JSON.stringify({
       exported_at: now.toISOString(),
       account: user.email,
@@ -144,9 +151,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: Deno.env.get("EXPORT_FROM") || "One Thing <onboarding@resend.dev>",
         to: [to],
-        subject: `One Thing export — ${stamp}`,
+        subject: `One Thing export - ${stamp}`,
         html:
-          `<p>Your One Thing export from ${now.toUTCString()}.</p>` +
+          `<p>Your One Thing export from ${when}.</p>` +
           `<p>${tasks.length} tasks: ${counts.pile} in the pile, ${counts.inbox} in the inbox, ` +
           `${counts.future} future, ${counts.done} done.</p>` +
           `<p>The CSV opens in Excel or Google Sheets. The JSON is a full backup, including settings and plans.</p>`,
